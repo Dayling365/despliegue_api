@@ -1,0 +1,18 @@
+services:
+  api:
+    build: .
+    container_name: libreria-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION}
+      - JwtSettings__SecretKey=${JWT_SECRET}
+    networks:
+      - dbnet
+ 
+networks:
+  dbnet:
+    external: true
+    name: ${DB_NETWORK}
