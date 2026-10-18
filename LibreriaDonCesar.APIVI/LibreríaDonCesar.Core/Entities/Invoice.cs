@@ -8,11 +8,13 @@ namespace LibreriaDonCesar.Core.Entities
 {
     public class Invoice
     {
-       public int Id { get; set; }
-         public DateTime CreatedDate { get; set; }
+        public int Id { get; set; }
+        public DateTime CreatedDate { get; set; }
         public int SaleId { get; set; }
         public bool IsPrinted { get; set; }
-       public decimal TotalAmount { get; set; }
+        public DateTime? PrintedDate { get; set; }
+        public decimal TotalAmount { get; set; }
+        public List<SaleDetail> Details { get; set; } = new List<SaleDetail>();
 
     }
 }
