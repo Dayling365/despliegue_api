@@ -12,14 +12,9 @@ namespace LibreriaDonCesar.DataAccess.Interfaces
     {
         Task<RepositoryResponse<PagedResponse<IEnumerable<Product>>>> GetAllAsync(PaginationParams pagination);
         Task<RepositoryResponse<Product>> GetByIdAsync(int id);
-        Task<RepositoryResponse<Product>> GetByNameAsync(string name);
-
+        Task<RepositoryResponse<IEnumerable<Product>>> GetByNameAsync(string name);
         Task<RepositoryResponse<Product>> AddAsync(Product product);
-
         Task<RepositoryResponse<Product>> UpdateAsync(int id, Product product);
-
         Task<RepositoryResponse<Product>> SetStateAsync(int productId, bool state);
-
-
     }
 }
