@@ -12,5 +12,8 @@ namespace LibreriaDonCesar.Core.Entities
         public Sale Master { get; set; }
 
         public IEnumerable<SaleDetail> Details { get; set; }
+
+        public IEnumerable<StockAlert> Alerts { get; set; } = new List<StockAlert>();
+
     }
 }

@@ -11,6 +11,7 @@ namespace LibreriaDonCesar.Core.Entities
         public int Id { get; set; }
         public DateTime PurchaseDate { get; set; }
         public int SupplierId { get; set; }
+        public string? SupplierName { get; set; }
         public decimal TotalAmount { get; set; }
         
     }

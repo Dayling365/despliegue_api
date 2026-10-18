@@ -8,7 +8,9 @@ namespace LibreriaDonCesar.Core.Entities
 {
     public class SaleDetail
     {
-        public string ProductName { get; set; }
+        public string? ProductName { get; set; }
+        public string? ColorName { get; set; }
+        public string? PresentationName { get; set; }
         public  int Id { get; set; }
         public int SaleId { get; set; }
         public int ProductId { get; set; }
