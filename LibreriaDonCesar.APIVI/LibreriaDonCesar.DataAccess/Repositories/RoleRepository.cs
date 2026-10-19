@@ -12,7 +12,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace LibreriaDonCesar.DataAccess.Repositories
 {
-   public class RoleRepository : IRoleRepository
+    public class RoleRepository : IRoleRepository
     {
 
         private readonly string _connectionString;
@@ -259,7 +259,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                 {
                     await connection.OpenAsync();
 
-                    SqlCommand cmd = new SqlCommand("USP_UpdateUser", connection);
+                    SqlCommand cmd = new SqlCommand("USP_UpdateRole", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Id", id);
                     cmd.Parameters.AddWithValue("@RoleName", role.RoleName);
@@ -326,7 +326,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     {
                         if (await reader.ReadAsync())
                         {
-                          roleUpdated = new Role
+                            roleUpdated = new Role
                             {
                                 Id = (int)reader["Id"],
                                 RoleName = reader["RoleName"].ToString(),
@@ -362,5 +362,5 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
 
 
-    
+
 
