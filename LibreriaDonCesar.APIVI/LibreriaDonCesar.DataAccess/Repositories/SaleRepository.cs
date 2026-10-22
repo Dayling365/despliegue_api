@@ -42,7 +42,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        // 1. Primer resultado: las cabeceras de la página
+                        // 1. Primer resultado: las cabeceras de la página (el detalle se consulta aparte por Id)
                         while (await reader.ReadAsync())
                         {
                             sales.Add(new SaleTransaction
@@ -51,36 +51,15 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                                 {
                                     Id = (int)reader["Id"],
                                     SaleDate = (DateTime)reader["SaleDate"],
-                                    CustomerType = reader["CustomerType"].ToString(),
+                                    CustomerTypeId = (int)reader["CustomerTypeId"],
+                                    CustomerTypeName = reader["CustomerTypeName"].ToString(),
                                     TotalAmount = (decimal)reader["TotalAmount"]
                                 },
                                 Details = new List<SaleDetail>()
                             });
                         }
 
-                        // 2. Saltar al Segundo resultado: los detalles de esas compras
-                        await reader.NextResultAsync();
-
-                        while (await reader.ReadAsync())
-                        {
-                            var detail = new SaleDetail
-                            {
-                                Id = (int)reader["Id"],
-                                SaleId = (int)reader["SaleId"],
-                                ProductId = (int)reader["ProductId"],
-                                ProductName = reader["ProductName"].ToString(),
-                                SalePrice = (decimal)reader["SalePrice"],
-                                LineTotal = (decimal)reader["LineTotal"],
-                                 Quantity = (int)reader["Quantity"],
-                            };
-
-                            var transaction = sales.FirstOrDefault(s => s.Master.Id == detail.SaleId);
-                            if (transaction != null)
-                            {
-                                transaction.Details = transaction.Details.Concat(new[] { detail }).ToList();
-                            }
-                        }
-
+                        // 2. Segundo resultado: el total de registros para calcular páginas
                         if (await reader.NextResultAsync() && await reader.ReadAsync())
                         {
                             totalRecords = reader.GetInt32(0);
@@ -103,9 +82,17 @@ namespace LibreriaDonCesar.DataAccess.Repositories
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
             }
             return response;
         }
+
         public async Task<RepositoryResponse<SaleTransaction>> GetByIdAsync(int id)
         {
             try
@@ -121,7 +108,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     var returnParam = cmd.Parameters.Add("@ReturnValue", SqlDbType.Int);
                     returnParam.Direction = ParameterDirection.ReturnValue;
 
-                    SaleTransaction transaction = null;
+                    SaleTransaction? transaction = null;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
@@ -132,9 +119,9 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                                 Master = new Sale
                                 {
                                     Id = (int)reader["Id"],
-                                  
                                     SaleDate = (DateTime)reader["SaleDate"],
-                                    CustomerType = reader["CustomerType"].ToString(),
+                                    CustomerTypeId = (int)reader["CustomerTypeId"],
+                                    CustomerTypeName = reader["CustomerTypeName"].ToString(),
                                     TotalAmount = (decimal)reader["TotalAmount"]
                                 },
                                 Details = new List<SaleDetail>()
@@ -153,6 +140,8 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                                     SaleId = (int)reader["SaleId"],
                                     ProductId = (int)reader["ProductId"],
                                     ProductName = reader["ProductName"].ToString(),
+                                    ColorName = reader["ColorName"] != DBNull.Value ? reader["ColorName"].ToString() : null,
+                                    PresentationName = reader["PresentationName"] != DBNull.Value ? reader["PresentationName"].ToString() : null,
                                     Quantity = (int)reader["Quantity"],
                                     SalePrice = (decimal)reader["SalePrice"],
                                     LineTotal = (decimal)reader["LineTotal"]
@@ -166,7 +155,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
                     return new RepositoryResponse<SaleTransaction>
                     {
-                        Data = transaction, 
+                        Data = transaction,
                         OperationStatusCode = returnedValue
                     };
                 }
@@ -194,29 +183,23 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
         public async Task<RepositoryResponse<SaleTransaction>> InsertAsync(Sale master, IEnumerable<SaleDetail> details)
         {
-            var transaction = new SaleTransaction();
+            SaleTransaction? transaction = null;
 
             try
             {
-
-              
-
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
-                 
 
                     SqlCommand cmd = new SqlCommand("USP_InsertSale", connection);
                     cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
-                    cmd.Parameters.AddWithValue("@CustomerType", master.CustomerType);                   
                     cmd.Parameters.AddWithValue("@SaleDate", master.SaleDate);
-
+                    cmd.Parameters.AddWithValue("@CustomerTypeId", master.CustomerTypeId);
 
                     var detailsTable = new DataTable();
                     detailsTable.Columns.Add("ProductId", typeof(int));
                     detailsTable.Columns.Add("Quantity", typeof(int));
-
 
                     foreach (var item in details)
                     {
@@ -225,49 +208,78 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
                     SqlParameter detailsParam = cmd.Parameters.AddWithValue("@SaleDetails", detailsTable);
                     detailsParam.SqlDbType = SqlDbType.Structured;
-                    detailsParam.TypeName = "SaleDetailType";
+                    detailsParam.TypeName = "dbo.SaleDetailType";
+
+                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
+                        // 1) la venta
                         if (await reader.ReadAsync())
                         {
+                            transaction = new SaleTransaction();
                             transaction.Master = new Sale
                             {
                                 Id = (int)reader["Id"],
-                                CustomerType = reader["CustomerType"].ToString(),
                                 SaleDate = (DateTime)reader["SaleDate"],
+                                CustomerTypeId = (int)reader["CustomerTypeId"],
+                                CustomerTypeName = reader["CustomerTypeName"].ToString(),
                                 TotalAmount = (decimal)reader["TotalAmount"]
-
                             };
-
-
                         }
 
-                        await reader.NextResultAsync();
-
-                        var detailsList = new List<SaleDetail>();
-
-                        while (await reader.ReadAsync())
+                        if (transaction != null)
                         {
-                            detailsList.Add(new SaleDetail
-                            {
-                                Id = (int)reader["Id"],
-                                SaleId = (int)reader["SaleId"],
-                                ProductId = (int)reader["ProductId"],
-                                ProductName = (string)reader["ProductName"],
-                                Quantity = (int)reader["Quantity"],
-                                SalePrice = (decimal)reader["SalePrice"],
-                                LineTotal = (decimal)reader["LineTotal"]
-                            });
-                        }
-                        transaction.Details = detailsList;
+                            // 2) el detalle
+                            var detailsList = new List<SaleDetail>();
 
+                            if (await reader.NextResultAsync())
+                            {
+                                while (await reader.ReadAsync())
+                                {
+                                    detailsList.Add(new SaleDetail
+                                    {
+                                        Id = (int)reader["Id"],
+                                        SaleId = (int)reader["SaleId"],
+                                        ProductId = (int)reader["ProductId"],
+                                        ProductName = reader["ProductName"].ToString(),
+                                        ColorName = reader["ColorName"] != DBNull.Value ? reader["ColorName"].ToString() : null,
+                                        PresentationName = reader["PresentationName"] != DBNull.Value ? reader["PresentationName"].ToString() : null,
+                                        Quantity = (int)reader["Quantity"],
+                                        SalePrice = (decimal)reader["SalePrice"],
+                                        LineTotal = (decimal)reader["LineTotal"]
+                                    });
+                                }
+                            }
+                            transaction.Details = detailsList;
+
+                            // 3) alertas de stock bajo de los productos vendidos
+                            var alertsList = new List<StockAlert>();
+
+                            if (await reader.NextResultAsync())
+                            {
+                                while (await reader.ReadAsync())
+                                {
+                                    alertsList.Add(new StockAlert
+                                    {
+                                        ProductId = (int)reader["ProductId"],
+                                        ProductName = reader["ProductName"].ToString(),
+                                        UnitsInStock = (int)reader["UnitsInStock"],
+                                        MinStock = (int)reader["MinStock"],
+                                        StockStatus = reader["StockStatus"].ToString()
+                                    });
+                                }
+                            }
+                            transaction.Alerts = alertsList;
+                        }
                     }
+
+                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
+
                     return new RepositoryResponse<SaleTransaction>
                     {
                         Data = transaction,
-                        OperationStatusCode = 0,
-                        Message = "Operacion exitosa"
+                        OperationStatusCode = returnedValue
                     };
                 }
             }
@@ -279,9 +291,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
             catch (Exception ex)
             {
                 return new RepositoryResponse<SaleTransaction>
@@ -291,8 +301,6 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     Message = ex.Message
                 };
             }
-
-
         }
 
         public async Task<RepositoryResponse<IEnumerable<SaleDetail>>> GetDetailByIdAsync(int saleId)
@@ -315,9 +323,11 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                             var detail = new SaleDetail
                             {
                                 Id = (int)reader["Id"],
-                               SaleId = (int)reader["SaleId"],
+                                SaleId = (int)reader["SaleId"],
                                 ProductId = (int)reader["ProductId"],
-                                ProductName= (string)reader["ProductName"],
+                                ProductName = reader["ProductName"].ToString(),
+                                ColorName = reader["ColorName"] != DBNull.Value ? reader["ColorName"].ToString() : null,
+                                PresentationName = reader["PresentationName"] != DBNull.Value ? reader["PresentationName"].ToString() : null,
                                 Quantity = (int)reader["Quantity"],
                                 SalePrice = (decimal)reader["SalePrice"],
                                 LineTotal = (decimal)reader["LineTotal"]
@@ -343,9 +353,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
             catch (Exception ex)
             {
                 return new RepositoryResponse<IEnumerable<SaleDetail>>
@@ -357,9 +365,10 @@ namespace LibreriaDonCesar.DataAccess.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<List<SaleTransaction>>> GetSaleByDateRangeAsync(DateTime startDate, DateTime endDate)
+        public async Task<RepositoryResponse<PagedResponse<IEnumerable<SaleTransaction>>>> GetSaleByDateRangeAsync(DateTime startDate, DateTime endDate, PaginationParams pagination)
         {
-            var transactions = new List<SaleTransaction>();
+            var sales = new List<SaleTransaction>();
+            var response = new RepositoryResponse<PagedResponse<IEnumerable<SaleTransaction>>>();
 
             try
             {
@@ -371,61 +380,55 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@StartDate", startDate);
                     cmd.Parameters.AddWithValue("@EndDate", endDate);
+                    cmd.Parameters.AddWithValue("@PageNumber", pagination.PageNumber);
+                    cmd.Parameters.AddWithValue("@PageSize", pagination.PageSize);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
+
+                    int totalRecords = 0;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
-
+                        // 1. Primer resultado: las cabeceras de la página
                         while (await reader.ReadAsync())
                         {
-                            transactions.Add(new SaleTransaction
+                            sales.Add(new SaleTransaction
                             {
                                 Master = new Sale
                                 {
                                     Id = (int)reader["Id"],
-                                    CustomerType = reader["CustomerType"].ToString(),
                                     SaleDate = (DateTime)reader["SaleDate"],
+                                    CustomerTypeId = (int)reader["CustomerTypeId"],
+                                    CustomerTypeName = reader["CustomerTypeName"].ToString(),
                                     TotalAmount = (decimal)reader["TotalAmount"]
                                 },
                                 Details = new List<SaleDetail>()
                             });
                         }
 
-                        await reader.NextResultAsync();
-
-                        while (await reader.ReadAsync())
+                        // 2. Segundo resultado: el total de registros para calcular páginas
+                        if (await reader.NextResultAsync() && await reader.ReadAsync())
                         {
-                            var detail = new SaleDetail
-                            {
-                                SaleId = (int)reader["SaleId"],
-                                ProductId = (int)reader["ProductId"],
-                                ProductName = reader["ProductName"].ToString(),
-                                Quantity = (int)reader["Quantity"],
-                                SalePrice = (decimal)reader["SalePrice"],
-                                LineTotal = (decimal)reader["LineTotal"]
-                            };
-
-                            var transaction = transactions.FirstOrDefault(t => t.Master.Id == detail.SaleId);
-                            if (transaction != null)
-                            {
-                                ((List<SaleDetail>)transaction.Details).Add(detail);
-                            }
+                            totalRecords = reader.GetInt32(0);
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
 
-                    return new RepositoryResponse<List<SaleTransaction>>
+                    response.Data = new PagedResponse<IEnumerable<SaleTransaction>>
                     {
-                        Data = transactions,
-                        OperationStatusCode = returnedValue,
-                        Message = transactions.Any() ? "Operación exitosa" : "No se encontraron compras en el rango de fechas"
+                        Data = sales,
+                        PageNumber = pagination.PageNumber,
+                        PageSize = pagination.PageSize,
+                        TotalRecords = totalRecords
                     };
+                    response.OperationStatusCode = returnedValue;
+
+                    return response;
                 }
             }
             catch (SqlException ex)
             {
-                return new RepositoryResponse<List<SaleTransaction>>
+                return new RepositoryResponse<PagedResponse<IEnumerable<SaleTransaction>>>
                 {
                     Data = null,
                     OperationStatusCode = ex.Number,
@@ -434,7 +437,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
             }
             catch (Exception ex)
             {
-                return new RepositoryResponse<List<SaleTransaction>>
+                return new RepositoryResponse<PagedResponse<IEnumerable<SaleTransaction>>>
                 {
                     Data = null,
                     OperationStatusCode = -1,
@@ -442,11 +445,5 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                 };
             }
         }
-
-
     }
 }
-
-
-    
-

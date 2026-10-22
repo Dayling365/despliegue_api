@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace LibreriaDonCesar.Core.Entities
 {
-    internal class StockAlert
+    public class StockAlert
     {
         public int ProductId { get; set; }
         public string? ProductName { get; set; }
