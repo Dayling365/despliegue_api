@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using LibreriaDonCesar.API.Configurations;
+using LibreriaDonCesar.API.Middlewares;
+using LibreriaDonCesar.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,7 +34,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-//Configuraci�n de Swagger para que agregue seguridad 
+//Configuración de Swagger para que agregue seguridad 
 
 builder.Services.AddSwaggerGen(options =>
 
@@ -39,7 +42,7 @@ builder.Services.AddSwaggerGen(options =>
 
     // 1. Define el esquema de seguridad (Security Scheme) 
 
-    // Esto le dice a Swagger que la API usa autenticaci�n "Bearer" (JWT). 
+    // Esto le dice a Swagger que la API usa autenticación "Bearer" (JWT). 
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
 
@@ -47,14 +50,14 @@ builder.Services.AddSwaggerGen(options =>
 
         Name = "Authorization", // El nombre del header HTTP 
         Type = SecuritySchemeType.ApiKey, // Tipo de esquema 
-        Scheme = "bearer", // El nombre del esquema (debe ser min�scula) 
+        Scheme = "bearer", // El nombre del esquema (debe ser minúscula) 
         BearerFormat = "JWT", // Formato del token 
-        In = ParameterLocation.Header, // D�nde se env�a el token 
+        In = ParameterLocation.Header, // Dónde se envía el token 
         Description = "Introduce tu token JWT usando este formato: Bearer {token}"
 
     });
 
-    // 2. A�ade el requisito de seguridad (Security Requirement) 
+    // 2. Añade el requisito de seguridad (Security Requirement) 
 
     // Esto le dice a Swagger que debe aplicar el esquema "Bearer" a los endpoints. 
 
@@ -180,8 +183,17 @@ builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 
 
+builder.Services.Configure<MongoLogSettings>(
+    builder.Configuration.GetSection("MongoLogSettings"));
+
+// 2. Inyectar Servicio de Logs como Singleton (MongoClient debe ser reutilizado)
+builder.Services.AddSingleton<ILogService, MongoLogService>();
+
+
 var app = builder.Build();
 
+
+app.UseMiddleware<AuditLoggingMiddleware>();
 
 app.UseSwagger();
 app.UseSwaggerUI();
