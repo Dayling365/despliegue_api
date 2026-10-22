@@ -2,25 +2,16 @@
 using LibreriaDonCesar.core.Common;
 using LibreriaDonCesar.Core.Common;
 using LibreriaDonCesar.Core.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-
 
 namespace LibreriaDonCesar.Business.Interfaces
 {
     public interface IInventoryMovementService
     {
-
         Task<ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>> GetAllAsync(PaginationParams pagination);
-
-        Task<ServiceResponse<InventoryMovement>> CreateAsync(CreateInventoryMovementDto newMovement);
         Task<ServiceResponse<InventoryMovement>> GetByIdAsync(int id);
-        Task<ServiceResponse<List<InventoryMovement>>> GetMovementsByDateRangeAsync(DateTime startDate, DateTime endDate);
-        Task<ServiceResponse<IEnumerable<InventoryMovement>>> GetMovementsByProductIdAsync(int productId);
-        Task<ServiceResponse<IEnumerable<InventoryMovement>>> GetMovementsByTypeAsync(string movementType);
+        Task<ServiceResponse<InventoryMovement>> CreateAsync(CreateInventoryMovementDto newMovement);
+        Task<ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>> GetMovementsByDateRangeAsync(DateTime startDate, DateTime endDate, PaginationParams pagination);
+        Task<ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>> GetMovementsByProductIdAsync(int productId, PaginationParams pagination);
+        Task<ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>> GetMovementsByTypeAsync(string movementType, PaginationParams pagination);
     }
 }

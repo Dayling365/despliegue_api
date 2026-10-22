@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
@@ -10,29 +9,19 @@ namespace LibreriaDonCesar.Business.DTOs
 {
     public class CreateProductDto
     {
-        [Required]
-        [StringLength(60, ErrorMessage = "El nombre del producto no debe exceder los 50 caracteres.")]
-        public string? ProductName { get; set; }
+        [Range(1, int.MaxValue, ErrorMessage = "El Id de la plantilla (BaseProductId) no es valido.")]
+        public int BaseProductId { get; set; }
 
-        [DefaultValue(0)]
-        [Range(1, int.MaxValue, ErrorMessage = "El Id de la categoria no es valido.")]
-        public int CategoryId { get; set; }
+        [Range(1, int.MaxValue, ErrorMessage = "El Id del color no es valido.")]
+        public int? ColorId { get; set; }
 
-        [DefaultValue(0)]
         [Range(1, int.MaxValue, ErrorMessage = "El Id de la presentacion no es valido.")]
-        public int PresentationId { get; set; }
+        public int? PresentationId { get; set; }
 
-        [DefaultValue(0)]
-        [Range(1, int.MaxValue, ErrorMessage = "El Id de la Marca no es valido.")]
-        public int BrandId { get; set; }
+        [Range(0, (double)decimal.MaxValue, ErrorMessage = "El precio de venta no puede ser negativo.")]
+        public decimal SalePrice { get; set; }
 
-        [DefaultValue(0)]
-        [Range(1, int.MaxValue, ErrorMessage = "El Id del Color no es valido.")]
-        public int ColorId { get; set; }
-
-        public decimal UnitPrice { get; set; }
-
-        [StringLength(200, ErrorMessage = "La descripción no debe exceder los 100 caracteres.")]
-        public string? Description { get; set; }
+        [Range(0, int.MaxValue, ErrorMessage = "El stock mínimo no puede ser negativo.")]
+        public int MinStock { get; set; }
     }
 }

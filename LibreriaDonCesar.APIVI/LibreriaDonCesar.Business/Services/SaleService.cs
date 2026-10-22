@@ -66,13 +66,13 @@ namespace LibreriaDonCesar.Business.Services
                     };
             }
         }
-        
+
         public async Task<ServiceResponse<SaleTransaction>> GetByIdAsync(int id)
         {
             try
             {
                 var repoResponse = await _saleRepository.GetByIdAsync(id);
-                if (repoResponse.OperationStatusCode == 0)
+                if (repoResponse.OperationStatusCode == 0 && repoResponse.Data != null)
                 {
                     return new ServiceResponse<SaleTransaction>
                     {
@@ -84,7 +84,8 @@ namespace LibreriaDonCesar.Business.Services
                 }
                 switch (repoResponse.OperationStatusCode)
                 {
-                    case 50071:
+                    case 0:
+                    case 50050:
                         return new ServiceResponse<SaleTransaction>
                         {
                             Data = null,
@@ -118,13 +119,20 @@ namespace LibreriaDonCesar.Business.Services
         {
             try
             {
-
-             
-
+                if (dto.CustomerTypeId == 0)
+                {
+                    return new ServiceResponse<SaleResponseDto>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.ErrorValidation,
+                        Message = "El Id del tipo de cliente no es valido"
+                    };
+                }
 
                 foreach (var detail in dto.Details)
                 {
-                    var existenProduct = await _inventoryService.GetByIdAsync(detail.ProductId);
+                    var existenProduct = await _inventoryService.GetByProductIdAsync(detail.ProductId);
                     if (existenProduct.Data! == null)
                     {
                         return new ServiceResponse<SaleResponseDto>
@@ -153,7 +161,7 @@ namespace LibreriaDonCesar.Business.Services
 
                 var saleMaster = new Sale
                 {
-                    CustomerType = dto.CustomerType,
+                    CustomerTypeId = dto.CustomerTypeId,
                     SaleDate = DateTime.Now,
                     TotalAmount = 0
                 };
@@ -168,23 +176,37 @@ namespace LibreriaDonCesar.Business.Services
 
                 var repoResponse = await _saleRepository.InsertAsync(saleMaster, saleDetail);
 
-                if (repoResponse.OperationStatusCode == 0)
+                if (repoResponse.OperationStatusCode == 0 && repoResponse.Data != null)
                 {
 
                     var dataResponse = new SaleResponseDto();
                     dataResponse.Id = repoResponse.Data!.Master.Id;
-                    dataResponse.CustomerType = repoResponse.Data!.Master.CustomerType;
+                    dataResponse.CustomerTypeId = repoResponse.Data!.Master.CustomerTypeId;
+                    dataResponse.CustomerTypeName = repoResponse.Data!.Master.CustomerTypeName;
                     dataResponse.SaleDate = repoResponse.Data!.Master.SaleDate;
                     dataResponse.TotalAmount = repoResponse.Data!.Master.TotalAmount;
 
                     dataResponse.Details = repoResponse.Data.Details.Select(dt => new SaleResponseDetailDto
                     {
                         ProductId = dt.ProductId,
-                        ProductName=dt.ProductName,
+                        ProductName = dt.ProductName,
+                        ColorName = dt.ColorName,
+                        PresentationName = dt.PresentationName,
                         Quantity = dt.Quantity,
                         SalePrice = dt.SalePrice,
                         LineTotal = dt.LineTotal
                     }).ToList();
+
+                    // productos de la venta que quedaron en el umbral mínimo o por debajo
+                    dataResponse.Alerts = repoResponse.Data.Alerts.Select(a => new StockAlertDto
+                    {
+                        ProductId = a.ProductId,
+                        ProductName = a.ProductName,
+                        UnitsInStock = a.UnitsInStock,
+                        MinStock = a.MinStock,
+                        StockStatus = a.StockStatus
+                    }).ToList();
+
                     return new ServiceResponse<SaleResponseDto>
                     {
                         Data = dataResponse,
@@ -194,16 +216,71 @@ namespace LibreriaDonCesar.Business.Services
 
                     };
                 }
-                else
-                {
-                    return new ServiceResponse<SaleResponseDto>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.ErrorDataBase,
-                        Message = " Hubo un error al registrada la Venta "
 
-                    };
+                switch (repoResponse.OperationStatusCode)
+                {
+                    case 50037:
+                        return new ServiceResponse<SaleResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "El detalle de la venta no puede estar vacío"
+                        };
+
+                    case 50050:
+                        return new ServiceResponse<SaleResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NotFound,
+                            Message = "El tipo de cliente indicado no existe"
+                        };
+
+                    case 50052:
+                        return new ServiceResponse<SaleResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NotFound,
+                            Message = "Uno o más productos no existen o están inactivos"
+                        };
+
+                    case 50060:
+                        return new ServiceResponse<SaleResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.Conflict,
+                            Message = "Stock insuficiente para completar la venta"
+                        };
+
+                    case 50062:
+                        return new ServiceResponse<SaleResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "La cantidad indicada no es válida"
+                        };
+
+                    case 50081:
+                        return new ServiceResponse<SaleResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "Hay productos repetidos en el detalle de la venta"
+                        };
+
+                    default:
+                        return new ServiceResponse<SaleResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorDataBase,
+                            Message = " Hubo un error al registrada la Venta "
+                        };
                 }
 
             }
@@ -235,12 +312,12 @@ namespace LibreriaDonCesar.Business.Services
                     {
                         var detailDto = new SaleResponseDetailDto
                         {
-                            //Id = item.Id,
-                            //SaleId = saleId,
                             ProductId = item.ProductId,
                             ProductName = item.ProductName,
+                            ColorName = item.ColorName,
+                            PresentationName = item.PresentationName,
                             Quantity = item.Quantity,
-                           SalePrice = item.SalePrice,
+                            SalePrice = item.SalePrice,
                             LineTotal = item.LineTotal
                         };
                         listaDto.Add(detailDto);
@@ -255,7 +332,7 @@ namespace LibreriaDonCesar.Business.Services
                 }
                 switch (repoResponse.OperationStatusCode)
                 {
-                    case 50073:
+                    case 50050:
                         return new ServiceResponse<IEnumerable<SaleResponseDetailDto>>
                         {
                             Data = null,
@@ -285,78 +362,43 @@ namespace LibreriaDonCesar.Business.Services
             }
         }
 
-        public async Task<ServiceResponse<List<SaleResponseDto>>> GetSaleByDateRangeAsync(DateTime startDate, DateTime endDate)
+        public async Task<ServiceResponse<PagedResponse<IEnumerable<SaleTransaction>>>> GetSaleByDateRangeAsync(DateTime startDate, DateTime endDate, PaginationParams pagination)
         {
-            try
-            {
-                var repoResponse = await _saleRepository.GetSaleByDateRangeAsync(startDate, endDate);
+            var result = await _saleRepository.GetSaleByDateRangeAsync(startDate, endDate, pagination);
 
-                if (repoResponse.OperationStatusCode == -1 || repoResponse.Data == null)
+            if (result.OperationStatusCode == 0)
+            {
+                return new ServiceResponse<PagedResponse<IEnumerable<SaleTransaction>>>
                 {
-                    return new ServiceResponse<List<SaleResponseDto>>
+                    Data = result.Data,
+                    IsSuccess = true,
+                    MessageCode = MessageCodes.Success,
+                    Message = "Ventas obtenidas exitosamente"
+                };
+            }
+
+            switch (result.OperationStatusCode)
+            {
+                case 50037:
+                    return new ServiceResponse<PagedResponse<IEnumerable<SaleTransaction>>>
+                    {
+                        Data = null,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.NoData,
+                        Message = "No se encontraron ventas en el rango proporcionado"
+                    };
+
+                default:
+                    return new ServiceResponse<PagedResponse<IEnumerable<SaleTransaction>>>
                     {
                         Data = null,
                         IsSuccess = false,
                         MessageCode = MessageCodes.ErrorDataBase,
-                        Message = "Ocurrió un error al obtener las ventas"
+                        Message = result.Message ?? "Ocurrió un error inesperado"
                     };
-                }
-
-                if (repoResponse.OperationStatusCode == 1 || !repoResponse.Data.Any())
-                {
-                    return new ServiceResponse<List<SaleResponseDto>>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.NotFound,
-                        Message = "No se encontraron ventas en el rango proporcionado"
-                    };
-                }
-
-                var salesDtoList = repoResponse.Data.Select(transaction => new SaleResponseDto
-                {
-                    Id = transaction.Master.Id,
-                    CustomerType = transaction.Master.CustomerType,
-                    SaleDate = transaction.Master.SaleDate,
-                    TotalAmount = transaction.Master.TotalAmount,
-                    Details = transaction.Details.Select(d => new SaleResponseDetailDto
-                    {
-                        //SaleId = d.SaleId,
-                        ProductId = d.ProductId,
-                        ProductName = d.ProductName,
-                        Quantity = d.Quantity,
-                        SalePrice = d.SalePrice,
-                        LineTotal = d.LineTotal
-                    }).ToList()
-                }).ToList();
-
-                return new ServiceResponse<List<SaleResponseDto>>
-                {
-                    Data = salesDtoList,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Compras obtenidas exitosamente"
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ServiceResponse<List<SaleResponseDto>>
-                {
-                    Data = null,
-                    IsSuccess = false,
-                    MessageCode = MessageCodes.ErrorDataBase,
-                    Message = $"Ocurrió un error inesperado: {ex.Message}"
-                };
             }
         }
 
     }
 
 }
-
-
-
-
-
-
-
