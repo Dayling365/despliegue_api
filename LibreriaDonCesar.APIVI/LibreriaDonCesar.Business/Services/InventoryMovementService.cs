@@ -4,13 +4,13 @@ using LibreriaDonCesar.core.Common;
 using LibreriaDonCesar.Core.Common;
 using LibreriaDonCesar.Core.Entities;
 using LibreriaDonCesar.DataAccess.Interfaces;
-using LibreriaDonCesar.DataAccess.Interfaces;
 using LibreriaDonCesar.DataAccess.Repositories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+
 namespace LibreriaDonCesar.Business.Services
 {
     public class InventoryMovementService : IInventoryMovementService
@@ -59,207 +59,15 @@ namespace LibreriaDonCesar.Business.Services
             }
         }
 
-        public async Task<ServiceResponse<InventoryMovement>> CreateAsync(CreateInventoryMovementDto newMovement)
-        {
-            try
-            {
-                // mapeo
-                var movement = new InventoryMovement()
-                {
-                    ProductId = newMovement.ProductId,
-                    MovementType = newMovement.MovementType,
-                    Quantity = newMovement.Quantity,
-                    Reason = newMovement.Reason
-                };
-
-                // llamado al metodo de repo
-                var result = await _inventoryMovementRepository.AddAsync(movement);
-
-                return new ServiceResponse<InventoryMovement>
-                {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Registro creado con exito"
-                };
-            }
-            catch (Exception)
-            {
-                return new ServiceResponse<InventoryMovement>
-                {
-                    Data = null,
-                    IsSuccess = false,
-                    MessageCode = MessageCodes.ErrorDataBase,
-                    Message = "Ocurrio un error inesperado"
-                };
-            }
-        }
-
         public async Task<ServiceResponse<InventoryMovement>> GetByIdAsync(int id)
         {
-            var repositoryResponse = await _inventoryMovementRepository.GetByIdAsync(id);
+            var repoResponse = await _inventoryMovementRepository.GetByIdAsync(id);
 
             try
             {
-
-                if (repositoryResponse.OperationStatusCode ==0)
+                if (repoResponse.OperationStatusCode == 0 && repoResponse.Data != null)
                 {
                     return new ServiceResponse<InventoryMovement>
-                    {
-                        Data = repositoryResponse.Data,
-                        IsSuccess = true,
-                        MessageCode = MessageCodes.Success,
-                        Message = repositoryResponse.Message ?? "Operacion exitosa"
-                    };
-                }
-                switch (repositoryResponse.OperationStatusCode)
-                {
-                    case 50100:
-                        return new ServiceResponse<InventoryMovement>
-                        {
-                            Data = null,
-                            IsSuccess = false,
-                            //notfound
-                            MessageCode = MessageCodes.NotFound,
-                            Message = repositoryResponse.Message ?? "No existe el movimiento de inventario"
-                        };
-
-                    default:
-                        return new ServiceResponse<InventoryMovement>
-                        {
-                            Data = null,
-                            IsSuccess = false,
-                            MessageCode = MessageCodes.ErrorDataBase,
-                            Message = repositoryResponse.Message ?? "Ocurrio un error inesperado"
-                        };
-                }
-            }
-            catch (Exception)
-            {
-                return new ServiceResponse<InventoryMovement>
-                {
-                    Data = null,
-                    IsSuccess = false,
-                    MessageCode = MessageCodes.ErrorDataBase,
-                    Message = repositoryResponse.Message ?? "Ocurrio un error inesperado"
-                };
-
-            }
-        }
-
-        public async Task<ServiceResponse<List<InventoryMovement>>> GetMovementsByDateRangeAsync(DateTime startDate, DateTime endDate)
-        {
-            try
-            {
-                var repoResponse = await _inventoryMovementRepository.GetMovementsByDateRangeAsync(startDate, endDate);
-
-                if (repoResponse.OperationStatusCode == 0)
-                {
-                    return new ServiceResponse<List<InventoryMovement>>
-                    {
-                        Data = repoResponse.Data.ToList(),
-                        IsSuccess = true,
-                        MessageCode = MessageCodes.Success,
-                        Message = "Movimeinto de inventario obtenidos exitosamente"
-                    };
-                }
-
-                switch (repoResponse.OperationStatusCode)
-                {
-                    case 50037:
-                        return new ServiceResponse<List<InventoryMovement>>
-                        {
-                            Data = null,
-                            IsSuccess = false,
-                            MessageCode = MessageCodes.NotFound,
-                            Message = "No se encontraron movimiento de inventario en el rango proporcionado"
-                        };
-
-                    default:
-                        return new ServiceResponse<List<InventoryMovement>>
-                        {
-                            Data = null,
-                            IsSuccess = false,
-                            MessageCode = MessageCodes.ErrorDataBase,
-                            Message = repoResponse.Message ?? "Ocurrio un error inesperado"
-                        };
-                }
-
-               
-            }
-            catch (Exception ex)
-            {
-                return new ServiceResponse<List<InventoryMovement>>
-                {
-                    Data = null,
-                    IsSuccess = false,
-                    MessageCode = MessageCodes.ErrorDataBase,
-                    Message = $"Ocurrió un error inesperado: {ex.Message}"
-                };
-            }
-        }
-
-        public async Task<ServiceResponse<IEnumerable<InventoryMovement>>> GetMovementsByProductIdAsync(int productId)
-        {
-            var repositoryResponse = await _inventoryMovementRepository.GetMovementsByProductIdAsync(productId);
-
-            try
-            {
-                if (repositoryResponse.OperationStatusCode == 0)
-                {
-                    return new ServiceResponse<IEnumerable<InventoryMovement>>
-                    {
-                        Data = repositoryResponse.Data,
-                        IsSuccess = true,
-                        MessageCode = MessageCodes.Success,
-                        Message = repositoryResponse.Message ?? "Operacion exitosa"
-                    };
-                }
-                switch (repositoryResponse.OperationStatusCode)
-                {
-                    case 50100:
-                        return new ServiceResponse<IEnumerable<InventoryMovement>>
-                        {
-                            Data = null,
-                            IsSuccess = false,
-                            //notfound
-                            MessageCode = MessageCodes.NotFound,
-                            Message = repositoryResponse.Message ?? "No existe el movimiento de inventario de ese producto"
-                        };
-
-                    default:
-                        return new ServiceResponse<IEnumerable<InventoryMovement>>
-                        {
-                            Data = null,
-                            IsSuccess = false,
-                            MessageCode = MessageCodes.ErrorDataBase,
-                            Message = repositoryResponse.Message ?? "Ocurrio un error inesperado"
-                        };
-                }
-            }
-            catch (Exception)
-            {
-                return new ServiceResponse<IEnumerable<InventoryMovement>>
-                {
-                    Data = null,
-                    IsSuccess = false,
-                    MessageCode = MessageCodes.ErrorDataBase,
-                    Message = repositoryResponse.Message ?? "Ocurrio un error inesperado"
-                };
-
-            }
-        }
-
-        public async Task<ServiceResponse<IEnumerable<InventoryMovement>>> GetMovementsByTypeAsync(string movementType)
-        {
-            var repoResponse = await _inventoryMovementRepository.GetMovementsByTypeAsync(movementType);
-            try
-            {
-               
-
-                if (repoResponse.OperationStatusCode == 0)
-                {
-                    return new ServiceResponse<IEnumerable<InventoryMovement>>
                     {
                         Data = repoResponse.Data,
                         IsSuccess = true,
@@ -270,17 +78,18 @@ namespace LibreriaDonCesar.Business.Services
 
                 switch (repoResponse.OperationStatusCode)
                 {
-                    case 50037:
-                        return new ServiceResponse<IEnumerable<InventoryMovement>>
+                    case 0:
+                    case 50050:
+                        return new ServiceResponse<InventoryMovement>
                         {
                             Data = null,
                             IsSuccess = false,
                             MessageCode = MessageCodes.NotFound,
-                            Message = repoResponse.Message ?? "No se encontraron movimientos para el tipo proporcionado"
+                            Message = repoResponse.Message ?? "No se encontro registro asociado  al Id proporcionado"
                         };
 
-                   default:
-                        return new ServiceResponse<IEnumerable<InventoryMovement>>
+                    default:
+                        return new ServiceResponse<InventoryMovement>
                         {
                             Data = null,
                             IsSuccess = false,
@@ -291,23 +100,231 @@ namespace LibreriaDonCesar.Business.Services
             }
             catch (Exception)
             {
-                return new ServiceResponse<IEnumerable<InventoryMovement>>
+                return new ServiceResponse<InventoryMovement>
                 {
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    Message = "Ocurrio un error inesperado"
+                    Message = repoResponse.Message ?? "Ocurrio un error inesperado"
                 };
             }
         }
 
+        // Entrada / Salida / Baja: Quantity = unidades que se mueven. Ajuste: Quantity = nuevo stock final.
+        public async Task<ServiceResponse<InventoryMovement>> CreateAsync(CreateInventoryMovementDto newMovement)
+        {
+            try
+            {
+                if (newMovement.ProductId == 0)
+                {
+                    return new ServiceResponse<InventoryMovement>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.ErrorValidation,
+                        Message = "El Id del producto no es valido"
+                    };
+                }
 
+                var movement = new InventoryMovement()
+                {
+                    ProductId = newMovement.ProductId,
+                    MovementType = newMovement.MovementType,
+                    Quantity = newMovement.Quantity,
+                    Reason = newMovement.Reason,
+                };
 
+                var result = await _inventoryMovementRepository.AddAsync(movement);
+
+                if (result.OperationStatusCode == 0 && result.Data != null)
+                {
+                    return new ServiceResponse<InventoryMovement>
+                    {
+                        Data = result.Data,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Movimiento registrado con exito",
+                    };
+                }
+
+                switch (result.OperationStatusCode)
+                {
+                    case 50050:
+                        return new ServiceResponse<InventoryMovement>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NotFound,
+                            Message = "No existe inventario para el producto indicado"
+                        };
+
+                    case 50060:
+                        return new ServiceResponse<InventoryMovement>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.Conflict,
+                            Message = "Stock insuficiente para completar la operación"
+                        };
+
+                    case 50061:
+                        return new ServiceResponse<InventoryMovement>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "El tipo de movimiento no es válido (Entrada, Salida, Ajuste o Baja)"
+                        };
+
+                    case 50062:
+                        return new ServiceResponse<InventoryMovement>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "La cantidad indicada no es válida"
+                        };
+
+                    default:
+                        return new ServiceResponse<InventoryMovement>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorDataBase,
+                            Message = result.Message ?? "Ocurrio un error inesperado"
+                        };
+                }
+            }
+            catch (Exception)
+            {
+                return new ServiceResponse<InventoryMovement>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrio un error inesperado",
+                };
+            }
+        }
+
+        public async Task<ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>> GetMovementsByDateRangeAsync(DateTime startDate, DateTime endDate, PaginationParams pagination)
+        {
+            var result = await _inventoryMovementRepository.GetByDateRangeAsync(startDate, endDate, pagination);
+
+            if (result.OperationStatusCode == 0)
+            {
+                return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                {
+                    Data = result.Data,
+                    IsSuccess = true,
+                    MessageCode = MessageCodes.Success,
+                    Message = "Operacion exitosa"
+                };
+            }
+
+            switch (result.OperationStatusCode)
+            {
+                case 50037:
+                    return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                    {
+                        Data = null,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.NoData,
+                        Message = "No hay movimientos en el rango indicado"
+                    };
+
+                default:
+                    return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.ErrorDataBase,
+                        Message = result.Message ?? "Ocurrió un error inesperado"
+                    };
+            }
+        }
+
+        public async Task<ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>> GetMovementsByProductIdAsync(int productId, PaginationParams pagination)
+        {
+            var result = await _inventoryMovementRepository.GetByProductIdAsync(productId, pagination);
+
+            if (result.OperationStatusCode == 0)
+            {
+                return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                {
+                    Data = result.Data,
+                    IsSuccess = true,
+                    MessageCode = MessageCodes.Success,
+                    Message = "Operacion exitosa"
+                };
+            }
+
+            switch (result.OperationStatusCode)
+            {
+                case 50037:
+                    return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                    {
+                        Data = null,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.NoData,
+                        Message = "El producto no tiene movimientos"
+                    };
+
+                case 50050:
+                    return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.NotFound,
+                        Message = "No existe un producto asociado al Id proporcionado"
+                    };
+
+                default:
+                    return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.ErrorDataBase,
+                        Message = result.Message ?? "Ocurrió un error inesperado"
+                    };
+            }
+        }
+
+        public async Task<ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>> GetMovementsByTypeAsync(string movementType, PaginationParams pagination)
+        {
+            var result = await _inventoryMovementRepository.GetByTypeAsync(movementType, pagination);
+
+            if (result.OperationStatusCode == 0)
+            {
+                return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                {
+                    Data = result.Data,
+                    IsSuccess = true,
+                    MessageCode = MessageCodes.Success,
+                    Message = "Operacion exitosa"
+                };
+            }
+
+            switch (result.OperationStatusCode)
+            {
+                case 50037:
+                    return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                    {
+                        Data = null,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.NoData,
+                        Message = "No hay movimientos de ese tipo"
+                    };
+
+                default:
+                    return new ServiceResponse<PagedResponse<IEnumerable<InventoryMovement>>>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.ErrorDataBase,
+                        Message = result.Message ?? "Ocurrió un error inesperado"
+                    };
+            }
+        }
     }
-
-
-
-
-
 }
-

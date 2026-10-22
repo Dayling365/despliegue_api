@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace LibreriaDonCesar.Business.Services
 {
-    public class ProductService: IProductService
+    public class ProductService : IProductService
     {
         private readonly IProductRepository _productRepository;
 
@@ -67,7 +67,7 @@ namespace LibreriaDonCesar.Business.Services
 
             try
             {
-                if (repoResponse.OperationStatusCode == 0)
+                if (repoResponse.OperationStatusCode == 0 && repoResponse.Data != null)
                 {
                     return new ServiceResponse<Product>
                     {
@@ -81,6 +81,7 @@ namespace LibreriaDonCesar.Business.Services
 
                 switch (repoResponse.OperationStatusCode)
                 {
+                    case 0:
                     case 50050:
                         return new ServiceResponse<Product>
                         {
@@ -120,12 +121,13 @@ namespace LibreriaDonCesar.Business.Services
         }
 
 
-        public async Task<ServiceResponse<Product>> GetByNameAsync(string name)
+        // Devuelve TODAS las variantes (color / presentación) del producto con ese nombre
+        public async Task<ServiceResponse<IEnumerable<Product>>> GetByNameAsync(string name)
         {
             var result = await _productRepository.GetByNameAsync(name);
-            if (result.OperationStatusCode == 0)
+            if (result.OperationStatusCode == 0 && result.Data != null && result.Data.Any())
             {
-                return new ServiceResponse<Product>
+                return new ServiceResponse<IEnumerable<Product>>
                 {
                     Data = result.Data,
                     IsSuccess = true,
@@ -139,6 +141,7 @@ namespace LibreriaDonCesar.Business.Services
 
             switch (result.OperationStatusCode)
             {
+                case 0:
                 case 50051:
                     messageCode = MessageCodes.NotFound;
                     message = "No se encontro producto con el Name proporcionado";
@@ -151,7 +154,7 @@ namespace LibreriaDonCesar.Business.Services
             }
 
 
-            return new ServiceResponse<Product>
+            return new ServiceResponse<IEnumerable<Product>>
             {
                 Data = null,
                 IsSuccess = false,
@@ -165,25 +168,14 @@ namespace LibreriaDonCesar.Business.Services
         {
             try
             {
-                /*var existingProduct = await _productRepository.GetByNameAsync(newProduct.ProductName);
-                if (existingProduct.Data!.Id != 0 && !existingProduct.Data.ProductName.IsNullOrEmpty())
-                {
-                    return new ServiceResponse<Product>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.Conflict,
-                        Message = "Existe un registro con el Name proporcionado"
-                    };
-                }*/
-                if (newProduct.CategoryId == 0)
+                if (newProduct.BaseProductId == 0)
                 {
                     return new ServiceResponse<Product>
                     {
                         Data = null,
                         IsSuccess = false,
                         MessageCode = MessageCodes.ErrorValidation,
-                        Message = "El Id de la Categoría no es valido"
+                        Message = "El Id del producto base no es valido"
                     };
                 }
                 if (newProduct.PresentationId == 0)
@@ -194,16 +186,6 @@ namespace LibreriaDonCesar.Business.Services
                         IsSuccess = false,
                         MessageCode = MessageCodes.ErrorValidation,
                         Message = "El Id de la Presentación no es valido"
-                    };
-                }
-                if (newProduct.BrandId == 0)
-                {
-                    return new ServiceResponse<Product>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.ErrorValidation,
-                        Message = "El Id de la marca no es valida"
                     };
                 }
                 if (newProduct.ColorId == 0)
@@ -221,24 +203,64 @@ namespace LibreriaDonCesar.Business.Services
 
                 var product = new Product()
                 {
-                    ProductName = newProduct.ProductName,
-                    CategoryId = newProduct.CategoryId,
-                    PresentationId = newProduct.PresentationId,
-                    BrandId = newProduct.BrandId,
+                    BaseProductId = newProduct.BaseProductId,
                     ColorId = newProduct.ColorId,
-                    UnitPrice= newProduct.UnitPrice,
-                    Description = newProduct.Description,
+                    PresentationId = newProduct.PresentationId,
+                    SalePrice = newProduct.SalePrice,
+                    MinStock = newProduct.MinStock,
                 };
 
                 var result = await _productRepository.AddAsync(product);
 
-                return new ServiceResponse<Product>
+                if (result.OperationStatusCode == 0 && result.Data != null)
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Registro creado con exito",
-                };
+                    return new ServiceResponse<Product>
+                    {
+                        Data = result.Data,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Registro creado con exito",
+                    };
+                }
+
+                switch (result.OperationStatusCode)
+                {
+                    case 50020:
+                        return new ServiceResponse<Product>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.Conflict,
+                            Message = "Ya existe una variante con ese producto base, color y presentación"
+                        };
+
+                    case 50050:
+                        return new ServiceResponse<Product>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NotFound,
+                            Message = "El producto base, el color o la presentación indicada no existe"
+                        };
+
+                    case 50082:
+                        return new ServiceResponse<Product>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "El stock mínimo no puede ser negativo"
+                        };
+
+                    default:
+                        return new ServiceResponse<Product>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorDataBase,
+                            Message = result.Message ?? "Ocurrio un error inesperado"
+                        };
+                }
             }
             catch (Exception)
             {
@@ -258,9 +280,9 @@ namespace LibreriaDonCesar.Business.Services
         {
             try
             {
-                //validar que la categoria exista segun Id
+                //validar que el producto exista segun Id
                 var existingIdProduct = await _productRepository.GetByIdAsync(id);
-                if (existingIdProduct.Data!.Id == 0 && existingIdProduct.Data.ProductName.IsNullOrEmpty())
+                if (existingIdProduct.OperationStatusCode == 50050 || (existingIdProduct.OperationStatusCode == 0 && existingIdProduct.Data == null))
                 {
                     return new ServiceResponse<Product>
                     {
@@ -272,14 +294,14 @@ namespace LibreriaDonCesar.Business.Services
                     };
                 }
 
-                if (product.CategoryId == 0)
+                if (product.BaseProductId == 0)
                 {
                     return new ServiceResponse<Product>
                     {
                         Data = null,
                         IsSuccess = false,
                         MessageCode = MessageCodes.ErrorValidation,
-                        Message = "El Id de la Categoría no es valido"
+                        Message = "El Id del producto base no es valido"
                     };
                 }
                 if (product.PresentationId == 0)
@@ -292,16 +314,6 @@ namespace LibreriaDonCesar.Business.Services
                         Message = "El Id de la Presentación no es valido"
                     };
                 }
-                if (product.BrandId == 0)
-                {
-                    return new ServiceResponse<Product>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.ErrorValidation,
-                        Message = "El Id de la marca no es valida"
-                    };
-                }
                 if (product.ColorId == 0)
                 {
                     return new ServiceResponse<Product>
@@ -312,16 +324,13 @@ namespace LibreriaDonCesar.Business.Services
                         Message = "El Id del color no es valido"
                     };
                 }
-                //mapeo 
+                //mapeo
                 var dataProduct = new Product()
                 {
-                    ProductName = product.ProductName,
-                    CategoryId = product.CategoryId,
-                    PresentationId = product.PresentationId,
-                    BrandId = product.BrandId,
+                    BaseProductId = product.BaseProductId,
                     ColorId = product.ColorId,
-                    UnitPrice= product.UnitPrice,
-                    Description = product.Description,
+                    PresentationId = product.PresentationId,
+                    SalePrice = product.SalePrice,
                     State = product.State,
                 };
 
@@ -329,13 +338,46 @@ namespace LibreriaDonCesar.Business.Services
                 //llamando al metodo de repo
                 var result = await _productRepository.UpdateAsync(id, dataProduct);
 
-                return new ServiceResponse<Product>
+                if (result.OperationStatusCode == 0 && result.Data != null)
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Registro actualizado con exito",
-                };
+                    return new ServiceResponse<Product>
+                    {
+                        Data = result.Data,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Registro actualizado con exito",
+                    };
+                }
+
+                switch (result.OperationStatusCode)
+                {
+                    case 50020:
+                        return new ServiceResponse<Product>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.Conflict,
+                            Message = "Ya existe otra variante con ese producto base, color y presentación"
+                        };
+
+                    case 50050:
+                        return new ServiceResponse<Product>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NotFound,
+                            Message = "No existe un producto asociado al Id proporcionado"
+                        };
+
+                    default:
+                        return new ServiceResponse<Product>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorDataBase,
+                            Message = result.Message ?? "Ocurrio un error inesperado"
+                        };
+                }
             }
             catch (Exception)
             {
@@ -358,16 +400,20 @@ namespace LibreriaDonCesar.Business.Services
             var response = new ServiceResponse<Product>();
 
             var existingProduct = await _productRepository.GetByIdAsync(productId);
-            if (existingProduct == null)
+            if (existingProduct.Data == null)
             {
                 response.Data = null;
                 response.IsSuccess = false;
-                response.MessageCode = MessageCodes.ErrorValidation;
-                response.Message = "El producto no existe";
+                response.MessageCode = existingProduct.OperationStatusCode == 0 || existingProduct.OperationStatusCode == 50050
+                    ? MessageCodes.NotFound
+                    : MessageCodes.ErrorDataBase;
+                response.Message = existingProduct.OperationStatusCode == 0 || existingProduct.OperationStatusCode == 50050
+                    ? "El producto no existe"
+                    : existingProduct.Message ?? "Ocurrio un error inesperado";
                 return response;
             }
 
-            if(existingProduct.Data.State == state)
+            if (existingProduct.Data.State == state)
             {
                 response.Data = existingProduct.Data;
                 response.IsSuccess = true;

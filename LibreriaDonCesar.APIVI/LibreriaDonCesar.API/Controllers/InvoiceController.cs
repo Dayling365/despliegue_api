@@ -20,7 +20,7 @@ namespace WebAPI.API.Controllers
             _invoiceService = invoice;
         }
 
-        [Authorize(Roles ="Administrador, Vendedor")]
+        [Authorize(Roles = "Administrador, Vendedor")]
         [HttpGet("PrintQueue")]
         public async Task<IActionResult> PrintQueue()
         {
@@ -54,7 +54,7 @@ namespace WebAPI.API.Controllers
             }
 
         }
-        
+
         [Authorize(Roles = "Administrador, Vendedor")]
         [HttpGet("ToPrint")]
         public async Task<IActionResult> ToPrint()

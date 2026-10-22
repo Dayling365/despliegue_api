@@ -6,7 +6,7 @@ using LibreriaDonCesar.DataAccess.Interfaces;
 
 namespace LibreriaDonCesar.Business.Services
 {
-    public class InvoiceService:IInvoiceService
+    public class InvoiceService : IInvoiceService
     {
         private readonly IInvoiceRepository _invoiceRepository;
         public InvoiceService(IInvoiceRepository invoice)
@@ -51,11 +51,11 @@ namespace LibreriaDonCesar.Business.Services
                 {
                     Data = null,
                     IsSuccess = false,
-                    Message = "Ocurrio un erro inesperado",
+                    Message = repositoryResponse.Message ?? "Ocurrio un erro inesperado",
                     MessageCode = MessageCodes.ErrorDataBase
                 };
             }
-            catch (Exception )
+            catch (Exception)
             {
                 return new ServiceResponse<List<Invoice>>
                 {
@@ -71,7 +71,18 @@ namespace LibreriaDonCesar.Business.Services
         {
             try
             {
-            var FillQueue = await _invoiceRepository.GetInvoiceQueue();
+                var FillQueue = await _invoiceRepository.GetInvoiceQueue();
+                if (FillQueue.OperationStatusCode != 0)
+                {
+                    return new ServiceResponse<Invoice>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.ErrorDataBase,
+                        Message = FillQueue.Message ?? "Ocurrio un error inesperado"
+                    };
+                }
+
                 if (FillQueue.Data!.Count == 0)
                 {
                     return new ServiceResponse<Invoice>
@@ -98,7 +109,7 @@ namespace LibreriaDonCesar.Business.Services
                 }
 
                 // No hay facturas que imprimir
-                if (repoResponse.OperationStatusCode == 1)
+                if (repoResponse.OperationStatusCode == 50037)
                 {
                     return new ServiceResponse<Invoice>
                     {
@@ -106,6 +117,30 @@ namespace LibreriaDonCesar.Business.Services
                         IsSuccess = false,
                         MessageCode = MessageCodes.NoData,
                         Message = "No hay facturas para imprimir"
+                    };
+                }
+
+                // La factura ya había sido impresa
+                if (repoResponse.OperationStatusCode == 50070)
+                {
+                    return new ServiceResponse<Invoice>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.Conflict,
+                        Message = "La factura ya había sido impresa"
+                    };
+                }
+
+                // La factura no existe
+                if (repoResponse.OperationStatusCode == 50050)
+                {
+                    return new ServiceResponse<Invoice>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.NotFound,
+                        Message = "No se encontró la factura a imprimir"
                     };
                 }
 

@@ -14,7 +14,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace LibreriaDonCesar.Business.Services
 {
-    public class RoleService: IRoleService
+    public class RoleService : IRoleService
     {
         private readonly IRoleRepository _roleRepository;
 
@@ -238,7 +238,7 @@ namespace LibreriaDonCesar.Business.Services
                 }
 
                 //mapeo
-                var dataRole = new  Role()
+                var dataRole = new Role()
                 {
                     RoleName = role.RoleName,
                     State = role.State,
@@ -287,14 +287,14 @@ namespace LibreriaDonCesar.Business.Services
                 response.Data = existingRole.Data;
                 response.IsSuccess = true;
                 response.MessageCode = MessageCodes.Success;
-                response.Message = state ?"El rol ya esta activado":"El rol ya esta desactivado ";
+                response.Message = state ? "El rol ya esta activado" : "El rol ya esta desactivado ";
                 return response;
             }
 
             // Llamar al repositorio para actualizar el estado
             var repoResponse = await _roleRepository.SetStateAsync(roleId, state);
 
- 
+
             if (repoResponse.Data == null)
             {
                 response.Data = null;
@@ -304,7 +304,7 @@ namespace LibreriaDonCesar.Business.Services
                 return response;
             }
 
-           
+
 
             // Construir la respuesta exitosa
             response.Data = repoResponse.Data;

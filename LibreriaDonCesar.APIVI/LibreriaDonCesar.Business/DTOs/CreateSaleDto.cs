@@ -9,13 +9,11 @@ namespace LibreriaDonCesar.Business.DTOs
 {
     public class CreateSaleDto
     {
-        [Required(ErrorMessage = "El tipo de Cliente es requerido")]
-        public string CustomerType { get; set; }
+        [Range(1, int.MaxValue, ErrorMessage = "El tipo de cliente (CustomerTypeId) es requerido")]
+        public int CustomerTypeId { get; set; }
 
         [Required(ErrorMessage = " La venta debe incluir un detalle de compra")]
         [MinLength(1, ErrorMessage = "El detalle debe incluir el menos un producto")]
-        public List<CreateSaleDetailDto> Details { get; set; }
-
-
+        public List<CreateSaleDetailDto> Details { get; set; } = new List<CreateSaleDetailDto>();
     }
 }

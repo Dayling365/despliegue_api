@@ -13,11 +13,10 @@ using System.Threading.Tasks;
 
 namespace LibreriaDonCesar.Business.Services
 {
-    public class PurchaseService: IPurchaseService
+    public class PurchaseService : IPurchaseService
     {
         // Inyección de dependencias
         private readonly IPurchaseRepository _purchaseRepository;
-        private readonly ISupplierRepository _supplierRepository;
         private readonly IUserService _userService;
         private readonly ISupplierService _supplierService;
         private readonly IProductService _productService;
@@ -25,7 +24,7 @@ namespace LibreriaDonCesar.Business.Services
         public PurchaseService(
             IPurchaseRepository purchaseRepository,
             IUserService userService,
-            ISupplierService supplierService,IProductService productService)
+            ISupplierService supplierService, IProductService productService)
         {
             _purchaseRepository = purchaseRepository;
             _userService = userService;
@@ -34,7 +33,6 @@ namespace LibreriaDonCesar.Business.Services
         }
 
         public async Task<ServiceResponse<PagedResponse<IEnumerable<PurchaseTransaction>>>> GetAllPurchasesAsync(PaginationParams pagination)
-
         {
             var result = await _purchaseRepository.GetAllAsync(pagination);
 
@@ -70,12 +68,13 @@ namespace LibreriaDonCesar.Business.Services
                     };
             }
         }
+
         public async Task<ServiceResponse<PurchaseTransaction>> GetByIdAsync(int id)
         {
             try
             {
                 var repoResponse = await _purchaseRepository.GetByIdAsync(id);
-                if (repoResponse.OperationStatusCode == 0)
+                if (repoResponse.OperationStatusCode == 0 && repoResponse.Data != null)
                 {
                     return new ServiceResponse<PurchaseTransaction>
                     {
@@ -87,7 +86,8 @@ namespace LibreriaDonCesar.Business.Services
                 }
                 switch (repoResponse.OperationStatusCode)
                 {
-                    case 50037:
+                    case 0:
+                    case 50050:
                         return new ServiceResponse<PurchaseTransaction>
                         {
                             Data = null,
@@ -105,7 +105,7 @@ namespace LibreriaDonCesar.Business.Services
                         };
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return new ServiceResponse<PurchaseTransaction>
                 {
@@ -130,9 +130,10 @@ namespace LibreriaDonCesar.Business.Services
                     {
                         var detailDto = new PurchaseResponseDetailDto
                         {
-                            //PurchaseId = item.PurchaseId,
                             ProductId = item.ProductId,
                             ProductName = item.ProductName,
+                            ColorName = item.ColorName,
+                            PresentationName = item.PresentationName,
                             Quantity = item.Quantity,
                             PurchasePrice = item.PurchasePrice,
                             LineTotal = item.LineTotal
@@ -144,12 +145,12 @@ namespace LibreriaDonCesar.Business.Services
                         Data = listaDto,
                         IsSuccess = true,
                         MessageCode = MessageCodes.Success,
-                        Message = "Detalle obtenida exitosamente."
+                        Message = "Detalle obtenido exitosamente."
                     };
                 }
                 switch (repoResponse.OperationStatusCode)
                 {
-                    case 50037:
+                    case 50050:
                         return new ServiceResponse<IEnumerable<PurchaseResponseDetailDto>>
                         {
                             Data = null,
@@ -167,7 +168,7 @@ namespace LibreriaDonCesar.Business.Services
                         };
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return new ServiceResponse<IEnumerable<PurchaseResponseDetailDto>>
                 {
@@ -196,7 +197,7 @@ namespace LibreriaDonCesar.Business.Services
 
                     };
                 }
-              
+
 
                 foreach (var detail in dto.Details)
                 {
@@ -217,7 +218,7 @@ namespace LibreriaDonCesar.Business.Services
                 //Mapeo del Maestro de la compra
                 var purchaseMaster = new Purchase
                 {
-                   
+
                     SupplierId = dto.SupplierId,
                     PurchaseDate = DateTime.Now,
                     TotalAmount = 0
@@ -235,22 +236,25 @@ namespace LibreriaDonCesar.Business.Services
                 var repoResponse = await _purchaseRepository.InsertAsync(purchaseMaster, purchaseDetails);
 
                 //validar la respuesta del repositorio
-                if (repoResponse.OperationStatusCode == 0)
+                if (repoResponse.OperationStatusCode == 0 && repoResponse.Data != null)
                 {
                     //Mapeo de la respuesta al Dto de respuesta
                     var dataResponse = new PurchaseResponseDto();
 
                     //Mapeo de la parte Maestra
-                     dataResponse.Id = repoResponse.Data!.Master.Id;
-                     dataResponse.SupplierId = repoResponse.Data!.Master.SupplierId;
-                     dataResponse.PurchaseDate = repoResponse.Data!.Master.PurchaseDate;
-                     dataResponse.TotalAmount = repoResponse.Data!.Master.TotalAmount;
+                    dataResponse.Id = repoResponse.Data!.Master.Id;
+                    dataResponse.SupplierId = repoResponse.Data!.Master.SupplierId;
+                    dataResponse.SupplierName = repoResponse.Data!.Master.SupplierName;
+                    dataResponse.PurchaseDate = repoResponse.Data!.Master.PurchaseDate;
+                    dataResponse.TotalAmount = repoResponse.Data!.Master.TotalAmount;
 
                     //Mapeo de los detalles
                     dataResponse.Details = repoResponse.Data!.Details.Select(dt => new PurchaseResponseDetailDto
                     {
                         ProductId = dt.ProductId,
                         ProductName = dt.ProductName,
+                        ColorName = dt.ColorName,
+                        PresentationName = dt.PresentationName,
                         Quantity = dt.Quantity,
                         PurchasePrice = dt.PurchasePrice,
                         LineTotal = dt.LineTotal
@@ -266,15 +270,62 @@ namespace LibreriaDonCesar.Business.Services
                     };
 
                 }
-                else
+
+                switch (repoResponse.OperationStatusCode)
                 {
-                    return new ServiceResponse<PurchaseResponseDto>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.ErrorDataBase,
-                        Message = "Hubo un error al registrar la compra."
-                    };
+                    case 50037:
+                        return new ServiceResponse<PurchaseResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "El detalle de la compra no puede estar vacío"
+                        };
+
+                    case 50050:
+                        return new ServiceResponse<PurchaseResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NotFound,
+                            Message = "El proveedor indicado no existe"
+                        };
+
+                    case 50052:
+                        return new ServiceResponse<PurchaseResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NotFound,
+                            Message = "Uno o más productos no existen o están inactivos"
+                        };
+
+                    case 50062:
+                        return new ServiceResponse<PurchaseResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "La cantidad indicada no es válida"
+                        };
+
+                    case 50081:
+                        return new ServiceResponse<PurchaseResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorValidation,
+                            Message = "Hay productos repetidos en el detalle de la compra"
+                        };
+
+                    default:
+                        return new ServiceResponse<PurchaseResponseDto>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorDataBase,
+                            Message = "Hubo un error al registrar la compra."
+                        };
                 }
 
             }
@@ -291,72 +342,41 @@ namespace LibreriaDonCesar.Business.Services
 
         }
 
-        public async Task<ServiceResponse<List<PurchaseResponseDto>>> GetPurchasesByDateRangeAsync(DateTime startDate, DateTime endDate)
+        public async Task<ServiceResponse<PagedResponse<IEnumerable<PurchaseTransaction>>>> GetPurchasesByDateRangeAsync(DateTime startDate, DateTime endDate, PaginationParams pagination)
         {
-            try
+            var result = await _purchaseRepository.GetPurchasesByDateRangeAsync(startDate, endDate, pagination);
+
+            if (result.OperationStatusCode == 0)
             {
-                var repoResponse = await _purchaseRepository.GetPurchasesByDateRangeAsync(startDate, endDate);
-
-                if (repoResponse.OperationStatusCode == -1 || repoResponse.Data == null)
+                return new ServiceResponse<PagedResponse<IEnumerable<PurchaseTransaction>>>
                 {
-                    return new ServiceResponse<List<PurchaseResponseDto>>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.ErrorDataBase,
-                        Message = "Ocurrió un error al obtener las compras"
-                    };
-                }
-
-                if (repoResponse.OperationStatusCode == 1 || !repoResponse.Data.Any())
-                {
-                    return new ServiceResponse<List<PurchaseResponseDto>>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.NotFound,
-                        Message = "No se encontraron compras en el rango proporcionado"
-                    };
-                }
-
-                var salesDtoList = repoResponse.Data.Select(transaction => new PurchaseResponseDto
-                {
-                    Id = transaction.Master.Id,
-                    SupplierId = transaction.Master.SupplierId,
-                    PurchaseDate = transaction.Master.PurchaseDate,
-                    TotalAmount = transaction.Master.TotalAmount,
-                    Details = transaction.Details.Select(d => new PurchaseResponseDetailDto
-                    {
-                        //PurchaseId = d.PurchaseId,
-                        ProductId = d.ProductId,
-                        ProductName = d.ProductName,
-                        Quantity = d.Quantity,
-                        PurchasePrice = d.PurchasePrice,
-                        LineTotal = d.LineTotal
-                    }).ToList()
-                }).ToList();
-
-                return new ServiceResponse<List<PurchaseResponseDto>>
-                {
-                    Data = salesDtoList,
+                    Data = result.Data,
                     IsSuccess = true,
                     MessageCode = MessageCodes.Success,
                     Message = "Compras obtenidas exitosamente"
                 };
             }
-            catch (Exception ex)
+
+            switch (result.OperationStatusCode)
             {
-                return new ServiceResponse<List<PurchaseResponseDto>>
-                {
-                    Data = null,
-                    IsSuccess = false,
-                    MessageCode = MessageCodes.ErrorDataBase,
-                    Message = $"Ocurrió un error inesperado: {ex.Message}"
-                };
+                case 50037:
+                    return new ServiceResponse<PagedResponse<IEnumerable<PurchaseTransaction>>>
+                    {
+                        Data = null,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.NoData,
+                        Message = "No se encontraron compras en el rango proporcionado"
+                    };
+
+                default:
+                    return new ServiceResponse<PagedResponse<IEnumerable<PurchaseTransaction>>>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        MessageCode = MessageCodes.ErrorDataBase,
+                        Message = result.Message ?? "Ocurrió un error inesperado"
+                    };
             }
         }
-
     }
-
 }
-

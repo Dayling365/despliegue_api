@@ -1,5 +1,6 @@
 ﻿using LibreriaDonCesar.Business.DTOs;
 using LibreriaDonCesar.Business.Interfaces;
+using LibreriaDonCesar.core.Common;
 using LibreriaDonCesar.Core.Common;
 using LibreriaDonCesar.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -19,6 +20,7 @@ namespace LibreriaDonCesar.API.Controllers
             _saleService = saleService;
         }
 
+        /// <summary>Listado de ventas (solo cabecera). El detalle: GET /api/Sales/{id} o /api/Sales/details/{saleId}.</summary>
         [Authorize(Roles = "Vendedor, Administrador")]
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] PaginationParams pagination)
@@ -27,28 +29,18 @@ namespace LibreriaDonCesar.API.Controllers
 
             if (serviceResponse.IsSuccess && serviceResponse.Data != null)
             {
-                // 2. Mapeamos la colección desde serviceResponse.Data.Data respetando la estructura Maestro-Detalle
-                var saleDtoCollection = serviceResponse.Data.Data.Select(sl => new SaleResponseDto
+                var items = serviceResponse.Data.Data!.Select(x => new SaleResponseDto
                 {
-                    Id = sl.Master.Id,
-                    CustomerType = sl.Master.CustomerType,
-                    SaleDate = sl.Master.SaleDate,
-                    TotalAmount = sl.Master.TotalAmount,
-
-                    Details = sl.Details.Select(d => new SaleResponseDetailDto
-                    {
-                        ProductId = d.ProductId,
-                        ProductName = d.ProductName,
-                        Quantity = d.Quantity,
-                        SalePrice = d.SalePrice,
-                        LineTotal = d.LineTotal
-                    }).ToList()
+                    Id = x.Master.Id,
+                    CustomerTypeId = x.Master.CustomerTypeId,
+                    CustomerTypeName = x.Master.CustomerTypeName,
+                    SaleDate = x.Master.SaleDate,
+                    TotalAmount = x.Master.TotalAmount,
                 }).ToList();
 
-                // 3. Estructuramos la respuesta exitosa con los metadatos completos de paginación
                 var apiResponse = new ApiResponse<IEnumerable<SaleResponseDto>>
                 {
-                    Data = saleDtoCollection,
+                    Data = items,
                     Meta = new
                     {
                         totalRecords = serviceResponse.Data.TotalRecords,
@@ -62,7 +54,6 @@ namespace LibreriaDonCesar.API.Controllers
                 return Ok(apiResponse);
             }
 
-            // 4. Manejo de respuestas no exitosas idéntico al de Usuarios
             var unsuccessfulResponse = new UnsuccessfulResponseDto();
 
             switch (serviceResponse.MessageCode)
@@ -75,8 +66,8 @@ namespace LibreriaDonCesar.API.Controllers
 
                 default:
                     unsuccessfulResponse.Code = "500";
-                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
-                    unsuccessfulResponse.Details = new { info = "Error interno en la aplicación" };
+                    unsuccessfulResponse.Message = "Ocurrio un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno en la aplicacion" };
                     return StatusCode(500, unsuccessfulResponse);
             }
         }
@@ -85,6 +76,18 @@ namespace LibreriaDonCesar.API.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
+            if (id <= 0)
+            {
+                var response = new UnsuccessfulResponseDto()
+                {
+                    Code = "400",
+                    Message = "Id proporcionado debe ser mayor a 0",
+                    Details = new { info = "Error en el formato del valor enviado" }
+                };
+
+                return BadRequest(response);
+            }
+
             var serviceResponse = await _saleService.GetByIdAsync(id);
             if (serviceResponse.IsSuccess)
             {
@@ -92,17 +95,20 @@ namespace LibreriaDonCesar.API.Controllers
                 var saleDto = new SaleResponseDto
                 {
                     Id = sl.Master.Id,
-                    CustomerType = sl.Master.CustomerType,
+                    CustomerTypeId = sl.Master.CustomerTypeId,
+                    CustomerTypeName = sl.Master.CustomerTypeName,
                     SaleDate = sl.Master.SaleDate,
                     TotalAmount = sl.Master.TotalAmount,
                     Details = sl.Details.Select(d => new SaleResponseDetailDto
                     {
                         ProductId = d.ProductId,
-                        ProductName=d.ProductName,
+                        ProductName = d.ProductName,
+                        ColorName = d.ColorName,
+                        PresentationName = d.PresentationName,
                         Quantity = d.Quantity,
                         SalePrice = d.SalePrice,
                         LineTotal = d.LineTotal
-                    }).ToList()
+                    }).ToList(),
                 };
                 return Ok(new ApiResponse<SaleResponseDto>
                 {
@@ -110,25 +116,29 @@ namespace LibreriaDonCesar.API.Controllers
                     Meta = new { message = serviceResponse.Message }
                 });
             }
+
             var unsuccessfulResponse = new UnsuccessfulResponseDto();
+
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NotFound:
                     unsuccessfulResponse.Code = "404";
-                    unsuccessfulResponse.Message = serviceResponse.Message ?? "Recurso no encontrado.";
-                    unsuccessfulResponse.Details = serviceResponse.Details = new { info = serviceResponse.Message };
+                    unsuccessfulResponse.Message = "No se encontró el recurso solicitado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "No se encontro venta asociada al Id proporcionado" };
                     return NotFound(unsuccessfulResponse);
+
                 default:
                     unsuccessfulResponse.Code = "500";
-                    unsuccessfulResponse.Message = "Ocurrió un error inesperado.";
+                    unsuccessfulResponse.Message = "Ocurrio un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno en la aplicacion" };
                     return StatusCode(500, unsuccessfulResponse);
             }
         }
 
+        /// <summary>Registra la venta (y su factura). Si algún producto queda en el umbral mínimo, la respuesta incluye "alerts".</summary>
         [Authorize(Roles = "Vendedor, Administrador")]
         [HttpPost]
         public async Task<IActionResult> Register(CreateSaleDto dto)
-        
         {
             var serviceResponse = await _saleService.InsertAsync(dto);
 
@@ -145,36 +155,32 @@ namespace LibreriaDonCesar.API.Controllers
             }
 
             var unSuccessfulResponse = new UnsuccessfulResponseDto();
+
             switch (serviceResponse.MessageCode)
             {
-                case Core.Common.MessageCodes.ErrorValidation:
-                    unSuccessfulResponse.Code = "400";
-                    unSuccessfulResponse.Message = "Ocurrio un error en la validacion de datos";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message };
-                    return BadRequest(unSuccessfulResponse);
-                case Core.Common.MessageCodes.NotFound:
+                case MessageCodes.NotFound:
                     unSuccessfulResponse.Code = "404";
-                    unSuccessfulResponse.Message = "Recurso no encontrado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message };
+                    unSuccessfulResponse.Message = "No se encontró el recurso solicitado";
+                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Recurso no encontrado" };
                     return NotFound(unSuccessfulResponse);
+
+                case MessageCodes.ErrorValidation:
+                    unSuccessfulResponse.Code = "400";
+                    unSuccessfulResponse.Message = "El dato proporcionado no es válido";
+                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Revisa los campos enviados" };
+                    return BadRequest(unSuccessfulResponse);
 
                 case MessageCodes.Conflict:
                     unSuccessfulResponse.Code = "409";
                     unSuccessfulResponse.Message = "El registro no pudo guardarse por un conflicto";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message  };
+                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Hubo un conflicto" };
                     return Conflict(unSuccessfulResponse);
-
-
 
                 default:
                     unSuccessfulResponse.Code = "500";
                     unSuccessfulResponse.Message = "Ocurrio un error inesperado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message };
-
+                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno en la aplicacion" };
                     return StatusCode(500, unSuccessfulResponse);
-
-
-
             }
         }
 
@@ -190,6 +196,7 @@ namespace LibreriaDonCesar.API.Controllers
                     Message = "Id proporcionado debe ser mayor a 0",
                     Details = new { info = "Error en el formato del valor enviado" }
                 };
+
                 return BadRequest(response);
             }
 
@@ -197,57 +204,38 @@ namespace LibreriaDonCesar.API.Controllers
 
             if (serviceResponse.IsSuccess)
             {
-                var saleDetailDto = new List<SaleResponseDetailDto>();
-                foreach (var item in serviceResponse.Data)
+                return Ok(new ApiResponse<IEnumerable<SaleResponseDetailDto>>
                 {
-                    var detailDto = new SaleResponseDetailDto
-                    {
-                        //Id = item.Id,
-                       //SaleId = saleId,
-                        ProductId = item.ProductId,
-                        ProductName= item.ProductName,
-                        Quantity = item.Quantity,
-                        SalePrice = item.SalePrice,
-                        LineTotal = item.LineTotal
-                    };
-                    saleDetailDto.Add(detailDto);
-                }
-                return Ok(saleDetailDto);
+                    Data = serviceResponse.Data,
+                    Meta = new { message = serviceResponse.Message }
+                });
             }
-            else
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
+
+            switch (serviceResponse.MessageCode)
             {
-                UnsuccessfulResponseDto unsuccessfulResponse;
+                case MessageCodes.NotFound:
+                    unsuccessfulResponse.Code = "404";
+                    unsuccessfulResponse.Message = "No se encontró el recurso solicitado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "No se encontro un detalle asociado al Id proporcionado" };
+                    return NotFound(unsuccessfulResponse);
 
-                switch (serviceResponse.MessageCode)
-                {
-                    case MessageCodes.NotFound:
-                        unsuccessfulResponse = new UnsuccessfulResponseDto
-                        {
-                            Code = "404",
-                            Message = "No se encontro un detalle asociada al Id proporcionado",
-                            Details = new { info = serviceResponse.Message ?? "No se encontró el recurso solicitado" }
-                        };
-                        return NotFound(unsuccessfulResponse);
-
-                    default:
-                        unsuccessfulResponse = new UnsuccessfulResponseDto
-                        {
-                            Code = "500",
-                            Message = "Ocurrió un error",
-                            Details = new { info = serviceResponse.Message ?? "Error interno no esperado" }
-                        };
-                        return StatusCode(500, unsuccessfulResponse);
-                }
+                default:
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrio un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno en la aplicacion" };
+                    return StatusCode(500, unsuccessfulResponse);
             }
         }
 
         [Authorize(Roles = "Vendedor, Administrador")]
         [HttpGet("bydaterange")]
-        public async Task<IActionResult> GetSaleByDateRange([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetSaleByDateRange([FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] PaginationParams pagination)
         {
             if (startDate == default || endDate == default || endDate < startDate)
             {
-                return BadRequest(new
+                return BadRequest(new UnsuccessfulResponseDto()
                 {
                     Code = "400",
                     Message = "Los parámetros proporcionados no son válidos",
@@ -255,10 +243,34 @@ namespace LibreriaDonCesar.API.Controllers
                 });
             }
 
-            var serviceResponse = await _saleService.GetSaleByDateRangeAsync(startDate, endDate);
+            var serviceResponse = await _saleService.GetSaleByDateRangeAsync(startDate, endDate, pagination);
 
-            if (serviceResponse.IsSuccess)
-                return Ok(serviceResponse.Data);
+            if (serviceResponse.IsSuccess && serviceResponse.Data != null)
+            {
+                var items = serviceResponse.Data.Data!.Select(x => new SaleResponseDto
+                {
+                    Id = x.Master.Id,
+                    CustomerTypeId = x.Master.CustomerTypeId,
+                    CustomerTypeName = x.Master.CustomerTypeName,
+                    SaleDate = x.Master.SaleDate,
+                    TotalAmount = x.Master.TotalAmount,
+                }).ToList();
+
+                var apiResponse = new ApiResponse<IEnumerable<SaleResponseDto>>
+                {
+                    Data = items,
+                    Meta = new
+                    {
+                        totalRecords = serviceResponse.Data.TotalRecords,
+                        totalPages = serviceResponse.Data.TotalPages,
+                        pageNumber = serviceResponse.Data.PageNumber,
+                        pageSize = serviceResponse.Data.PageSize,
+                        message = serviceResponse.Message
+                    }
+                };
+
+                return Ok(apiResponse);
+            }
 
             var unsuccessfulResponse = new UnsuccessfulResponseDto();
 
@@ -267,35 +279,15 @@ namespace LibreriaDonCesar.API.Controllers
                 case MessageCodes.NoData:
                     unsuccessfulResponse.Code = "200";
                     unsuccessfulResponse.Message = "No se encontraron registros";
-                    unsuccessfulResponse.Details = new { info = "Temporalmente no hay registros en la BD" };
+                    unsuccessfulResponse.Details = new { info = "No hay ventas en el rango indicado" };
                     return Ok(unsuccessfulResponse);
-                case MessageCodes.NotFound:
-                    unsuccessfulResponse.Code = "404";
-                    unsuccessfulResponse.Message = serviceResponse.Message ?? "Recurso no encontrado.";
-                    unsuccessfulResponse.Details = serviceResponse.Details = new { info = serviceResponse.Message };
-                    return NotFound(unsuccessfulResponse);
-                case MessageCodes.Conflict:
-                    unsuccessfulResponse.Code = "409";
-                    unsuccessfulResponse.Message = "Stock insuficiente";
-                    unsuccessfulResponse.Details = new { info = "Las productos solicitados superan la cantidad disponible en inventario" };
-                    return Conflict(unsuccessfulResponse);
-
 
                 default:
                     unsuccessfulResponse.Code = "500";
-                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
-                    unsuccessfulResponse.Details = new { info = "Error interno en la aplicación" };
+                    unsuccessfulResponse.Message = "Ocurrio un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno en la aplicacion" };
                     return StatusCode(500, unsuccessfulResponse);
-
-                
             }
         }
-
-
-
-
     }
 }
-
-    
-

@@ -10,30 +10,18 @@ namespace LibreriaDonCesar.Business.DTOs
 {
     public class UpdateProductDto
     {
-        [Required]
-        [StringLength(60, ErrorMessage = "El nombre del producto no debe exceder los 50 caracteres.")]
-        public string? ProductName { get; set; }
-
-        [Range(1, int.MaxValue, ErrorMessage = "El Id de la categoria no es valido.")]
-        [DefaultValue(0)]
-        public int CategoryId { get; set; } 
-
-        [Range(1, int.MaxValue, ErrorMessage = "El Id de la presentacion.")]
-        [DefaultValue(0)]
-        public int PresentationId { get; set; } = 0;
-
-        [Range(1, int.MaxValue, ErrorMessage = "El Id de la marca no es valida.")]
-        [DefaultValue(0)]
-        public int BrandId { get; set; }
+        [Range(1, int.MaxValue, ErrorMessage = "El Id de la plantilla (BaseProductId) no es valido.")]
+        public int BaseProductId { get; set; }
 
         [Range(1, int.MaxValue, ErrorMessage = "El Id del color no es valido.")]
-        [DefaultValue(0)]
-        public int ColorId { get; set; }
+        public int? ColorId { get; set; }
 
-        
-        public decimal UnitPrice { get; set; }
-        [StringLength(200, ErrorMessage = "La descripción no debe exceder los 100 caracteres.")]
-        public string? Description { get; set; }
+        [Range(1, int.MaxValue, ErrorMessage = "El Id de la presentacion no es valido.")]
+        public int? PresentationId { get; set; }
+
+        [Range(0, (double)decimal.MaxValue, ErrorMessage = "El precio de venta no puede ser negativo.")]
+        public decimal SalePrice { get; set; }
+
         public bool State { get; set; }
     }
 }
