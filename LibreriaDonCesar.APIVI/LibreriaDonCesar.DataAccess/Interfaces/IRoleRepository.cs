@@ -8,7 +8,7 @@ using LibreriaDonCesar.Core.Entities;
 
 namespace LibreriaDonCesar.DataAccess.Interfaces
 {
-    public interface  IRoleRepository
+    public interface IRoleRepository
     {
         Task<RepositoryResponse<PagedResponse<IEnumerable<Role>>>> GetAllAsync(PaginationParams pagination);
 

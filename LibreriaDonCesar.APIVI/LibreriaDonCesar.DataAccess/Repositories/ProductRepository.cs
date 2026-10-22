@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace LibreriaDonCesar.DataAccess.Repositories
 {
-    public class ProductRepository: IProductRepository
+    public class ProductRepository : IProductRepository
     {
         private readonly string _connectionString;
 
@@ -46,17 +46,18 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                             products.Add(new Product
                             {
                                 Id = (int)reader["Id"],
-                                CategoryId = (int)reader["CategoryId"],
-                                CategoryName = reader["CategoryName"].ToString()!,
-                                PresentationId = (int)reader["PresentationId"],
-                                PresentationName = reader["PresentationName"].ToString()!,
+                                BaseProductId = (int)reader["BaseProductId"],
                                 ProductName = reader["ProductName"].ToString(),
+                                Description = reader["Description"] != DBNull.Value ? reader["Description"].ToString() : null,
+                                CategoryId = (int)reader["CategoryId"],
+                                CategoryName = reader["CategoryName"].ToString(),
                                 BrandId = (int)reader["BrandId"],
-                                BrandName = reader["BrandName"].ToString()!,
-                                ColorId = (int)reader["ColorId"],
-                                ColorName = reader["ColorName"].ToString()!,
-                                UnitPrice = Convert.ToDecimal(reader["UnitPrice"]),
-                                Description = reader["Description"].ToString(),
+                                BrandName = reader["BrandName"].ToString(),
+                                ColorId = reader["ColorId"] != DBNull.Value ? (int)reader["ColorId"] : null,
+                                ColorName = reader["ColorName"] != DBNull.Value ? reader["ColorName"].ToString() : null,
+                                PresentationId = reader["PresentationId"] != DBNull.Value ? (int)reader["PresentationId"] : null,
+                                PresentationName = reader["PresentationName"] != DBNull.Value ? reader["PresentationName"].ToString() : null,
+                                SalePrice = Convert.ToDecimal(reader["SalePrice"]),
                                 State = reader["State"] != DBNull.Value ? (bool)reader["State"] : false
                             });
                         }
@@ -82,13 +83,20 @@ namespace LibreriaDonCesar.DataAccess.Repositories
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
             }
             return response;
         }
 
         public async Task<RepositoryResponse<Product>> GetByIdAsync(int id)
         {
-            var productReturned = new Product();
+            Product? productReturned = null;
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -104,21 +112,21 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     {
                         if (await reader.ReadAsync())
                         {
+                            productReturned = new Product();
                             productReturned.Id = (int)reader["Id"];
-                            productReturned.CategoryId = (int)reader["CategoryId"];
-                            productReturned.CategoryName=reader["CategoryName"].ToString();
-                            productReturned.PresentationId = (int)reader["PresentationId"];
-                            productReturned.PresentationName = reader["PresentationName"].ToString();
+                            productReturned.BaseProductId = (int)reader["BaseProductId"];
                             productReturned.ProductName = reader["ProductName"].ToString();
+                            productReturned.Description = reader["Description"] != DBNull.Value ? reader["Description"].ToString() : null;
+                            productReturned.CategoryId = (int)reader["CategoryId"];
+                            productReturned.CategoryName = reader["CategoryName"].ToString();
                             productReturned.BrandId = (int)reader["BrandId"];
                             productReturned.BrandName = reader["BrandName"].ToString();
-                            productReturned.ColorId = (int)reader["ColorId"];
-                            productReturned.ColorName = reader["ColorName"].ToString();
-                            productReturned.UnitPrice = Convert.ToDecimal(reader["UnitPrice"]);
-                            productReturned.Description = reader["Description"].ToString();
+                            productReturned.ColorId = reader["ColorId"] != DBNull.Value ? (int)reader["ColorId"] : null;
+                            productReturned.ColorName = reader["ColorName"] != DBNull.Value ? reader["ColorName"].ToString() : null;
+                            productReturned.PresentationId = reader["PresentationId"] != DBNull.Value ? (int)reader["PresentationId"] : null;
+                            productReturned.PresentationName = reader["PresentationName"] != DBNull.Value ? reader["PresentationName"].ToString() : null;
+                            productReturned.SalePrice = Convert.ToDecimal(reader["SalePrice"]);
                             productReturned.State = (bool)reader["State"];
-
-
                         }
                     }
 
@@ -129,10 +137,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     {
                         Data = productReturned,
                         OperationStatusCode = returnedValue
-
                     };
-
-
                 }
             }
             catch (SqlException ex)
@@ -143,9 +148,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
             catch (Exception ex)
             {
                 return new RepositoryResponse<Product>
@@ -157,10 +160,11 @@ namespace LibreriaDonCesar.DataAccess.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<Product>> GetByNameAsync(string name)
+        // Devuelve TODAS las variantes (color / presentación) del producto con ese nombre
+        public async Task<RepositoryResponse<IEnumerable<Product>>> GetByNameAsync(string name)
         {
-            var Product = new Product();
-            var response = new RepositoryResponse<Product>();
+            var products = new List<Product>();
+            var response = new RepositoryResponse<IEnumerable<Product>>();
 
             try
             {
@@ -174,26 +178,31 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        if (await reader.ReadAsync())
+                        while (await reader.ReadAsync())
                         {
-                            Product.Id = (int)reader["Id"];
-                            Product.CategoryId = (int)reader["CategoryId"];
-                            Product.CategoryName = reader["CategoryName"].ToString();
-                            Product.PresentationId = (int)reader["PresentationId"];
-                            Product.ProductName = reader["ProductName"].ToString();
-                            Product.BrandId = (int)reader["BrandId"];
-                            Product.BrandName = reader["BrandName"].ToString();
-                            Product.ColorId = (int)reader["ColorId"];
-                            Product.ColorName = reader["ColorName"].ToString();
-                            Product.UnitPrice = Convert.ToDecimal(reader["UnitPrice"]);
-                            Product.Description = reader["Description"].ToString();
-                            Product.State = (bool)reader["State"];
+                            products.Add(new Product
+                            {
+                                Id = (int)reader["Id"],
+                                BaseProductId = (int)reader["BaseProductId"],
+                                ProductName = reader["ProductName"].ToString(),
+                                Description = reader["Description"] != DBNull.Value ? reader["Description"].ToString() : null,
+                                CategoryId = (int)reader["CategoryId"],
+                                CategoryName = reader["CategoryName"].ToString(),
+                                BrandId = (int)reader["BrandId"],
+                                BrandName = reader["BrandName"].ToString(),
+                                ColorId = reader["ColorId"] != DBNull.Value ? (int)reader["ColorId"] : null,
+                                ColorName = reader["ColorName"] != DBNull.Value ? reader["ColorName"].ToString() : null,
+                                PresentationId = reader["PresentationId"] != DBNull.Value ? (int)reader["PresentationId"] : null,
+                                PresentationName = reader["PresentationName"] != DBNull.Value ? reader["PresentationName"].ToString() : null,
+                                SalePrice = Convert.ToDecimal(reader["SalePrice"]),
+                                State = (bool)reader["State"]
+                            });
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
 
-                    response.Data = Product;
+                    response.Data = products;
                     response.OperationStatusCode = returnedValue;
 
                     return response;
@@ -203,11 +212,12 @@ namespace LibreriaDonCesar.DataAccess.Repositories
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
                 return response;
             }
             catch (Exception ex)
             {
-                return new RepositoryResponse<Product>
+                return new RepositoryResponse<IEnumerable<Product>>
                 {
                     Data = null,
                     OperationStatusCode = -1,
@@ -219,7 +229,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
         public async Task<RepositoryResponse<Product>> AddAsync(Product product)
         {
-            var productReturned = new Product();
+            Product? productReturned = null;
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -228,30 +238,33 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
                     SqlCommand cmd = new SqlCommand("USP_InsertNewProduct", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@CategoryId", product.CategoryId);
-                    cmd.Parameters.AddWithValue("@PresentationId", product.PresentationId);
-                    cmd.Parameters.AddWithValue("@ProductName", product.ProductName);
-                    cmd.Parameters.AddWithValue("@BrandId", product.BrandId);
-                    cmd.Parameters.AddWithValue("@ColorId", product.ColorId);
-                    cmd.Parameters.AddWithValue("@UnitPrice", product.UnitPrice);
-                    cmd.Parameters.AddWithValue("@Description", product.Description);
-                    //cmd.Parameters.AddWithValue("@State", product.State);
+                    cmd.Parameters.AddWithValue("@BaseProductId", product.BaseProductId);
+                    cmd.Parameters.AddWithValue("@ColorId", (object?)product.ColorId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@PresentationId", (object?)product.PresentationId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@SalePrice", product.SalePrice);
+                    cmd.Parameters.AddWithValue("@MinStock", product.MinStock);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            productReturned.Id = (int)reader["Id"];
-                            productReturned.CategoryId = (int)reader["CategoryId"];
-                            productReturned.PresentationId = (int)reader["PresentationId"];
+                            // el SP devuelve la fila de la vista del catálogo (la columna del id se llama ProductId)
+                            productReturned = new Product();
+                            productReturned.Id = (int)reader["ProductId"];
+                            productReturned.BaseProductId = (int)reader["BaseProductId"];
                             productReturned.ProductName = reader["ProductName"].ToString();
-                            productReturned.BrandId = (int)reader["BrandId"];  
-                            productReturned.ColorId = (int)reader["ColorId"];
-                            productReturned.UnitPrice = Convert.ToDecimal(reader["UnitPrice"]);
-                            productReturned.Description = reader["Description"].ToString();
-                            //productReturned.State = (bool)reader["State"];
-
+                            productReturned.Description = reader["Description"] != DBNull.Value ? reader["Description"].ToString() : null;
+                            productReturned.CategoryId = (int)reader["CategoryId"];
+                            productReturned.CategoryName = reader["CategoryName"].ToString();
+                            productReturned.BrandId = (int)reader["BrandId"];
+                            productReturned.BrandName = reader["BrandName"].ToString();
+                            productReturned.ColorId = reader["ColorId"] != DBNull.Value ? (int)reader["ColorId"] : null;
+                            productReturned.ColorName = reader["ColorName"] != DBNull.Value ? reader["ColorName"].ToString() : null;
+                            productReturned.PresentationId = reader["PresentationId"] != DBNull.Value ? (int)reader["PresentationId"] : null;
+                            productReturned.PresentationName = reader["PresentationName"] != DBNull.Value ? reader["PresentationName"].ToString() : null;
+                            productReturned.SalePrice = Convert.ToDecimal(reader["SalePrice"]);
+                            productReturned.State = (bool)reader["State"];
                         }
                     }
 
@@ -262,10 +275,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     {
                         Data = productReturned,
                         OperationStatusCode = returnedValue
-
                     };
-
-
                 }
             }
             catch (SqlException ex)
@@ -275,9 +285,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     Data = null,
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
-
                 };
-
             }
             catch (Exception ex)
             {
@@ -292,6 +300,7 @@ namespace LibreriaDonCesar.DataAccess.Repositories
 
         public async Task<RepositoryResponse<Product>> UpdateAsync(int id, Product product)
         {
+            Product? productUpdated = null;
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -301,42 +310,55 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     SqlCommand cmd = new SqlCommand("USP_UpdateProduct", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Id", id);
-                    cmd.Parameters.AddWithValue("@CategoryId", product.CategoryId);
-                    cmd.Parameters.AddWithValue("@PresentationId", product.PresentationId);
-                    cmd.Parameters.AddWithValue("@ProductName", product.ProductName);
-                    cmd.Parameters.AddWithValue("@BrandId", product.BrandId);
-                    cmd.Parameters.AddWithValue("@ColorId", product.ColorId);
-                    cmd.Parameters.AddWithValue("@UnitPrice", product.UnitPrice);
-                    cmd.Parameters.AddWithValue("@Description", product.Description);
+                    cmd.Parameters.AddWithValue("@BaseProductId", product.BaseProductId);
+                    cmd.Parameters.AddWithValue("@ColorId", (object?)product.ColorId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@PresentationId", (object?)product.PresentationId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@SalePrice", product.SalePrice);
                     cmd.Parameters.AddWithValue("@State", product.State);
-
-                    Product productUpdated = null;
+                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
+                            // el SP devuelve la fila de la vista del catálogo (la columna del id se llama ProductId)
                             productUpdated = new Product
                             {
-                                Id = (int)reader["Id"],
-                                CategoryId = (int)reader["CategoryId"],
-                                PresentationId = (int)reader["PresentationId"],
+                                Id = (int)reader["ProductId"],
+                                BaseProductId = (int)reader["BaseProductId"],
                                 ProductName = reader["ProductName"].ToString(),
+                                Description = reader["Description"] != DBNull.Value ? reader["Description"].ToString() : null,
+                                CategoryId = (int)reader["CategoryId"],
+                                CategoryName = reader["CategoryName"].ToString(),
                                 BrandId = (int)reader["BrandId"],
-                                ColorId = (int)reader["ColorId"],
-                                UnitPrice = Convert.ToDecimal(reader["UnitPrice"]),
-                                Description = reader["Description"].ToString(),
-                                State = (bool)reader["State"],
+                                BrandName = reader["BrandName"].ToString(),
+                                ColorId = reader["ColorId"] != DBNull.Value ? (int)reader["ColorId"] : null,
+                                ColorName = reader["ColorName"] != DBNull.Value ? reader["ColorName"].ToString() : null,
+                                PresentationId = reader["PresentationId"] != DBNull.Value ? (int)reader["PresentationId"] : null,
+                                PresentationName = reader["PresentationName"] != DBNull.Value ? reader["PresentationName"].ToString() : null,
+                                SalePrice = Convert.ToDecimal(reader["SalePrice"]),
+                                State = (bool)reader["State"]
                             };
                         }
                     }
 
+                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
+
                     return new RepositoryResponse<Product>
                     {
-                        Data = productUpdated, 
-                        OperationStatusCode = 0
+                        Data = productUpdated,
+                        OperationStatusCode = returnedValue
                     };
                 }
+            }
+            catch (SqlException ex)
+            {
+                return new RepositoryResponse<Product>
+                {
+                    Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
             }
             catch (Exception ex)
             {
@@ -362,23 +384,21 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     cmd.Parameters.AddWithValue("@Id", productId);
                     cmd.Parameters.AddWithValue("@State", state);
 
-                    Product productUpdated = null;
+                    Product? productUpdated = null;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
+                            // OUTPUT INSERTED.* de la tabla Products
                             productUpdated = new Product
                             {
                                 Id = (int)reader["Id"],
-                                CategoryId = (int)reader["CategoryId"],
-                                PresentationId = (int)reader["PresentationId"],
-                                ProductName = reader["ProductName"].ToString(),
-                                BrandId = (int)reader["BrandId"],
-                                ColorId = (int)reader["ColorId"],
-                                UnitPrice = Convert.ToDecimal(reader["UnitPrice"]),
-                                Description = reader["Description"].ToString(),
-                                State = (bool)reader["State"],
+                                BaseProductId = (int)reader["BaseProductId"],
+                                ColorId = reader["ColorId"] != DBNull.Value ? (int)reader["ColorId"] : null,
+                                PresentationId = reader["PresentationId"] != DBNull.Value ? (int)reader["PresentationId"] : null,
+                                SalePrice = Convert.ToDecimal(reader["SalePrice"]),
+                                State = (bool)reader["State"]
                             };
                         }
                     }
@@ -386,9 +406,18 @@ namespace LibreriaDonCesar.DataAccess.Repositories
                     return new RepositoryResponse<Product>
                     {
                         Data = productUpdated,
-                        OperationStatusCode = productUpdated != null ? 0 : 1
+                        OperationStatusCode = productUpdated != null ? 0 : 50050
                     };
                 }
+            }
+            catch (SqlException ex)
+            {
+                return new RepositoryResponse<Product>
+                {
+                    Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
             }
             catch (Exception ex)
             {

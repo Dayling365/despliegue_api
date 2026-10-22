@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace LibreriaDonCesar.Core.Entities
+﻿namespace LibreriaDonCesar.Core.Entities
 {
     public class Inventory
     {
@@ -14,6 +8,7 @@ namespace LibreriaDonCesar.Core.Entities
         public string? ColorName { get; set; }
         public string? PresentationName { get; set; }
         public decimal SalePrice { get; set; }
+        public decimal PurchasePrice { get; set; }
         public int UnitsInStock { get; set; }
         public int MinStock { get; set; }
         public bool IsLowStock { get; set; }
@@ -21,6 +16,3 @@ namespace LibreriaDonCesar.Core.Entities
         public int UnitsMissing { get; set; }
     }
 }
-
-    
-
