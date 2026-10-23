@@ -52,6 +52,5 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'api-cloud-libreriadoncesar'
-          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_CLIENTID_FF10BB3312AF443381C1B31527349C3C }} # <-- Asegúrate de que este sea el nombre exacto de tu secreto en GitHub
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_8B687E2B142A4F5B8EC34CA1E1695E80 }}
