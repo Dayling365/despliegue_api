@@ -146,6 +146,9 @@ builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<IUnitMeasureService, UnitMeasureService>();
 builder.Services.AddScoped<IUnitMeasureRepository, UnitMeasureRepository>();
 
+builder.Services.AddScoped<IBaseProductService, BaseProductService>();
+builder.Services.AddScoped<IBaseProductRepository, BaseProductRepository>();
+
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
