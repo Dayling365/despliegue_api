@@ -3,6 +3,8 @@ using LibreriaDonCesar.Business.Interfaces;
 using LibreriaDonCesar.Business.Services;
 using LibreriaDonCesar.Core.Common;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LibreriaDonCesar.API.Controllers
 {
@@ -11,10 +13,12 @@ namespace LibreriaDonCesar.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly IUserService _userService;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, IUserService userService)
         {
             _authService = authService;
+            _userService = userService;
         }
 
 
@@ -151,6 +155,49 @@ namespace LibreriaDonCesar.API.Controllers
                     return StatusCode(500, unSuccessfulResponse);
             }
         }
+
+
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            // El id viaja en el token (claim "sub"); según el mapeo puede llamarse NameIdentifier
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                              ?? User.FindFirstValue("sub");
+
+            if (!int.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new UnsuccessfulResponseDto
+                {
+                    Code = "401",
+                    Message = "Token inválido",
+                    Details = new { info = "No se pudo leer el id del usuario desde el token" }
+                });
+            }
+
+            var serviceResponse = await _userService.GetByIdAsync(userId);
+
+            if (serviceResponse.IsSuccess && serviceResponse.Data != null)
+            {
+                var userDto = new UserDto
+                {
+                    Id = serviceResponse.Data.Id,
+                    UserName = serviceResponse.Data.UserName,
+                    Email = serviceResponse.Data.Email,
+                    Roles = serviceResponse.Data.Roles
+                };
+
+                return Ok(userDto);
+            }
+
+            return NotFound(new UnsuccessfulResponseDto
+            {
+                Code = "404",
+                Message = "No se encontró el usuario del token",
+                Details = new { info = serviceResponse.Message ?? "Recurso no encontrado" }
+            });
+        }
+
 
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginRequestDto loginRequest)
