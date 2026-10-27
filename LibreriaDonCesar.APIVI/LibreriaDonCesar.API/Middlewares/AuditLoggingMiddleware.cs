@@ -78,7 +78,14 @@ public class AuditLoggingMiddleware
                 };
             }
             // Inserción en segundo plano (Fire-and-forget seguro)
-            _ = logService.InsertLogAsync(log);
+            try
+            {
+                _ = logService.InsertLogAsync(log);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WARNING] Fallo al registrar auditoría: {ex.Message}");
+            }
         }
     }
     private static string SanitizarPayload(string payload)

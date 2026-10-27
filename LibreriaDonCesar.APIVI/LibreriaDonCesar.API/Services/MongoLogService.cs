@@ -13,14 +13,24 @@ public class MongoLogService : ILogService
     public MongoLogService(IOptions<MongoLogSettings> options)
     {
         var settings = options.Value;
-        var client = new MongoClient(settings.ConnectionString);
+        var clientSettings = MongoClientSettings.FromConnectionString(settings.ConnectionString);
+        clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+        var client = new MongoClient(clientSettings);
         var database = client.GetDatabase(settings.DatabaseName);
         _collection = database.GetCollection<SystemLog>(settings.CollectionName);
-        InicializarIndices(settings.RetentionDays);
+        try
+        {
+            InicializarIndices(settings.RetentionDays);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARNING] No se pudieron crear los índices de MongoDB: {ex.Message}");
+        }
     }
     private void InicializarIndices(int retentionDays)
     {
-        var ttlKeys = Builders<SystemLog>.IndexKeys.Ascending(x => x.Timestamp);
+        // Cosmos DB for MongoDB (RU) solo admite índices TTL sobre "_ts"
+        var ttlKeys = Builders<SystemLog>.IndexKeys.Ascending("_ts");
         var ttlOptions = new CreateIndexOptions 
         { 
             ExpireAfter = TimeSpan.FromDays(retentionDays) 
