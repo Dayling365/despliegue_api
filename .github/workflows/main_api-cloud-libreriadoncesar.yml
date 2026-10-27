@@ -29,7 +29,7 @@ jobs:
       
       - name: dotnet publish
         working-directory: ./LibreriaDonCesar.APIVI
-        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+        run: dotnet publish LibreriaDonCesar.API/LibreriaDonCesar.API.csproj -c Release -o ${{env.DOTNET_ROOT}}/myapp
         
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4

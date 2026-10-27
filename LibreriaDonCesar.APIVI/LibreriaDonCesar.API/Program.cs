@@ -183,9 +183,12 @@ builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 
 
-builder.Services.Configure<MongoLogSettings>(
-    builder.Configuration.GetSection("MongoLogSettings"));
-
+builder.Services.Configure<MongoLogSettings>(options =>
+{
+    builder.Configuration.GetSection("MongoLogSettings").Bind(options);
+    options.ConnectionString = builder.Configuration.GetConnectionString("MongoDbConnection")
+                               ?? options.ConnectionString;
+});
 // 2. Inyectar Servicio de Logs como Singleton (MongoClient debe ser reutilizado)
 builder.Services.AddSingleton<ILogService, MongoLogService>();
 
