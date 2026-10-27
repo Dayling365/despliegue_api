@@ -52,5 +52,5 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'api-cloud-libreriadoncesar'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_8B687E2B142A4F5B8EC34CA1E1695E80 }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
