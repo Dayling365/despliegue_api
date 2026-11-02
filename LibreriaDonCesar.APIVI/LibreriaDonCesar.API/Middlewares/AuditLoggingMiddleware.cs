@@ -200,6 +200,7 @@ public class AuditLoggingMiddleware
         var userName =
             context.User.Identity?.Name
             ?? context.User.FindFirst(ClaimTypes.Name)?.Value
+            ?? context.User.FindFirst("name")?.Value
             ?? context.User.FindFirst("preferred_username")?.Value
             ?? context.User.FindFirst("unique_name")?.Value;
 
