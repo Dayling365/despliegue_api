@@ -199,8 +199,6 @@ builder.Services.AddSingleton<ILogService, MongoLogService>();
 var app = builder.Build();
 
 
-app.UseMiddleware<AuditLoggingMiddleware>();
-
 app.UseSwagger();
 app.UseSwaggerUI();
 
@@ -209,6 +207,8 @@ app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseMiddleware<AuditLoggingMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
