@@ -52,12 +52,31 @@ public class MongoLogService : ILogService
 
         var traceKeys = Builders<SystemLog>.IndexKeys.Ascending(x => x.TraceId);
         var levelKeys = Builders<SystemLog>.IndexKeys.Ascending(x => x.Level);
+        // Cosmos DB exige un índice sobre el campo usado en SortBy (GetLogsAsync)
+        var timestampKeys = Builders<SystemLog>.IndexKeys.Ascending(x => x.Timestamp);
 
-        _collection.Indexes.CreateMany([
+        var indices = new[]
+        {
+            new CreateIndexModel<SystemLog>(timestampKeys),
             new CreateIndexModel<SystemLog>(ttlKeys, ttlOptions),
             new CreateIndexModel<SystemLog>(traceKeys),
             new CreateIndexModel<SystemLog>(levelKeys)
-        ]);
+        };
+
+        // Uno por uno: si un índice falla, los demás se siguen creando
+        foreach (var indice in indices)
+        {
+            try
+            {
+                _collection.Indexes.CreateOne(indice);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"[WARNING] No se pudo crear un índice de MongoDB: {ex.Message}"
+                );
+            }
+        }
     }
 
     public async Task InsertLogAsync(SystemLog log)
